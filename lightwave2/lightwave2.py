@@ -51,7 +51,7 @@ class LWLink2():
     def __init__(self, username, password):
         self._username = username
         self._password = password
-        asyncio.get_event_loop().run_until_complete(self.startWebSocket())
+        #asyncio.get_event_loop().run_until_complete(self.startWebSocket())
 
     async def startWebSocket(self):
         self.websocket = await websockets.connect(TRANS_SERVER, ssl=True)
