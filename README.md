@@ -1,0 +1,1 @@
+Python library to provide a reliable communication link with LightWaveRF second generation lights and switches.
