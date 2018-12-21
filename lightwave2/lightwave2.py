@@ -80,8 +80,10 @@ class LWLink2():
 
     #TODO find a way of def _processmessages(self) (non-async version)
 
-    async def consumer_handler(self):
-        async for jsonmessage in self.websocket:
+    @asyncio.coroutine
+    def consumer_handler(self):
+        while True:
+            jsonmessage = yield from self.websocket.recv()
             message = json.loads(jsonmessage)
             #Some transaction IDs don't work, this is a workaround
             if message["class"] == "feature" and (message["operation"] == "write" or message["operation"] == "read"):
