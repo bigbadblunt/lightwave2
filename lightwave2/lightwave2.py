@@ -62,7 +62,7 @@ class LWLink2():
 
     async def async_connect(self):
         self.websocket = await websockets.connect(TRANS_SERVER, ssl=True)
-        asyncio.create_task(self.consumer_handler())
+        asyncio.ensure_future(self.consumer_handler())
         await self.authenticate()
 
     def _sendmessage(self, message):
