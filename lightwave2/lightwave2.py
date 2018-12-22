@@ -208,7 +208,7 @@ class LWLink2():
     async def asyncTurnOffByDeviceID(self, deviceId):
         y = self.getDeviceByID(deviceId)
         featureId = y.features["switch"][0]
-        await self.async_writeFeature(featureId, 1)
+        await self.async_writeFeature(featureId, 0)
 
     def setBrightnessByDeviceID(self, deviceId, level):
         return asyncio.get_event_loop().run_until_complete(self.asyncSetBrightnessByDeviceID(deviceId, level))
@@ -216,7 +216,7 @@ class LWLink2():
     async def asyncSetBrightnessByDeviceID(self, deviceId, level):
         y = self.getDeviceByID(deviceId)
         featureId = y.features["dimLevel"][0]
-        await self.async_writeFeature(featureId, 1)
+        await self.async_writeFeature(featureId, level)
 
     def getSwitches(self):
         temp = []
