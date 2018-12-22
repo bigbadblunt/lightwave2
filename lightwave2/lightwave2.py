@@ -45,63 +45,81 @@ class _LWRFMessageItem():
         _LWRFMessageItem._item_id += 1
         self._item["payload"] = payload
 
+class _LWRFDevice():
+
+    def __init__(self):
+        self.deviceId = None
+        self.name = None
+        self.productCode = None
+        self.features = {}
+        self._switchable = False
+        self._dimmable = False
+
+    def isSwitch(self):
+        return self._switchable and not self._dimmable
+
+    def isLight(self):
+        return self._dimmable
+
+
 class LWLink2():
 
     def __init__(self, username, password):
         self._username = username
         self._password = password
         self._device_id = str(uuid.uuid4())
-        self._devices = []
-        self._features = []
+        self._websocket = None
+        self.devices = []
+
+        #Next three variables are used to synchronise responses to requests
         self._transaction = None
         self._waitingforresponse = asyncio.Event()
         self._response = None
-
-    def connect(self):
-        return asyncio.get_event_loop().run_until_complete(self.async_connect())
-
-    async def async_connect(self):
-        self.websocket = await websockets.connect(TRANS_SERVER, ssl=True)
-        asyncio.ensure_future(self.consumer_handler())
-        await self.authenticate()
 
     def _sendmessage(self, message):
         return asyncio.get_event_loop().run_until_complete(self._async_sendmessage(message))
 
     async def _async_sendmessage(self, message):
         #await self.outgoing.put(message)
-        print("Sending:", message.json())
-        await self.websocket.send(message.json())
+        _LOGGER.debug("Sending: %s", message.json())
+        await self._websocket.send(message.json())
         self._transaction = message._message["transactionId"]
         self._waitingforresponse.clear()
         await self._waitingforresponse.wait()
-        print("Response:", self._response)
+        _LOGGER.debug("Response: %s", str(self._response))
         return self._response
 
-    #TODO find a way of def _processmessages(self) (non-async version)
-
+    #Use asyncio.coroutine for compatibility with Python 3.5
     @asyncio.coroutine
-    def consumer_handler(self):
+    def _consumer_handler(self):
         while True:
-            jsonmessage = yield from self.websocket.recv()
+            jsonmessage = yield from self._websocket.recv()
             message = json.loads(jsonmessage)
+            _LOGGER.debug("Received %s", message)
             #Some transaction IDs don't work, this is a workaround
             if message["class"] == "feature" and (message["operation"] == "write" or message["operation"] == "read"):
                 message["transactionId"] = message["items"][0]["itemId"]
+            #now parse the message
             if message["transactionId"] == self._transaction:
                 self._waitingforresponse.set()
                 self._transactions = None
                 self._response = message
+            elif message["direction"] == "notification" and message["class"] == "group" and message["operation"] == "event":
+                yield from self.async_getRootGroups()
+                yield from self.async_updateDeviceStates()
+            elif message["direction"] == "notification" and message["operation"] == "event":
+                deviceId = message["items"][0]["payload"]["_feature"]["deviceId"]
+                feature = message["items"][0]["payload"]["_feature"]["featureType"]
+                value = message["items"][0]["payload"]["value"]
+                assert self.getDeviceByID(deviceId).features[feature][0] == message["items"][0]["payload"]["_feature"]["featureId"]
+                self.getDeviceByID(deviceId).features[feature][1] = value
             else:
-                #TODO direction = "notification", class = "group", "operation" = "update" - update rootgroups et al
-                #TODO direction = "notification", class = "event", update internal state
-                #TODO catch others
-                print("Received:", message)
+                _LOGGER.warning("Received unhandled message: %s", message)
 
-    def getRootGroups(self):
-        return asyncio.get_event_loop().run_until_complete(self.async_getRootGroups())
+    def getHierarchy(self):
+        return asyncio.get_event_loop().run_until_complete(self.async_getHierarchy())
 
-    async def async_getRootGroups(self):
+    async def async_getHierarchy(self):
         readmess = _LWRFMessage("user", "rootGroups")
         readitem = _LWRFMessageItem()
         readmess.additem(readitem)
@@ -109,12 +127,11 @@ class LWLink2():
 
         for item in response["items"]:
             groupIds = item["payload"]["groupIds"]
-            await self.async_readGroups(groupIds)
+            await self._async_readGroups(groupIds)
 
-    def readGroups(self, groupIds):
-        return asyncio.get_event_loop().run_until_complete(self.async_readGroups(groupIds))
+        await self.async_updateDeviceStates()
 
-    async def async_readGroups(self, groupIds):
+    async def _async_readGroups(self, groupIds):
         for groupId in groupIds:
             readmess = _LWRFMessage("group", "read")
             readitem = _LWRFMessageItem({"groupId": groupId,
@@ -126,9 +143,32 @@ class LWLink2():
                                                     "subgroupDepth": 10})
             readmess.additem(readitem)
             response = await self._async_sendmessage(readmess)
-            self._devices = list(response["items"][0]["payload"]["devices"].values())
-            self._features = list(response["items"][0]["payload"]["features"].values())
+
+            self.devices = []
+            for x in list(response["items"][0]["payload"]["devices"].values()):
+                newDevice = _LWRFDevice()
+                newDevice.deviceId = x["deviceId"]
+                newDevice.name = x["name"]
+                newDevice.productCode = x["productCode"]
+                self.devices.append(newDevice)
+            for x in list(response["items"][0]["payload"]["features"].values()):
+                y = self.getDeviceByID(x["deviceId"])
+                y.features[x["attributes"]["type"]] = [x["featureId"], x["attributes"]["value"]]
+                if x["attributes"]["type"] == "switch":
+                    y._switchable = True
+                if x["attributes"]["type"] == "dimLevel":
+                    y._dimmable = True
+
             #TODO - work out if I caer about "group"/"hierarchy"
+
+    def updateDeviceStates(self):
+        return asyncio.get_event_loop().run_until_complete(self.async_updateDeviceStates())
+
+    async def async_updateDeviceStates(self):
+        for x in self.devices:
+            for y in x.features:
+                value = await self.async_readFeature(x.features[y][0])
+                x.features[y][1] = value["items"][0]["payload"]["value"]
 
     def writeFeature(self, featureId, value):
         return asyncio.get_event_loop().run_until_complete(self.async_writeFeature(featureId, value))
@@ -142,88 +182,90 @@ class LWLink2():
     def readFeature(self, featureId):
         return asyncio.get_event_loop().run_until_complete(self.async_readFeature(featureId))
 
+    async def async_readFeature(self, featureId):
+        readmess = _LWRFMessage("feature", "read")
+        readitem = _LWRFMessageItem({"featureId": featureId})
+        readmess.additem(readitem)
+        return await self._async_sendmessage(readmess)
+
+    def getDeviceByID(self, deviceId):
+        for x in self.devices:
+            if x.deviceId == deviceId:
+                return x
+        return None
+
     def turnOnByDeviceID(self, deviceId):
         return asyncio.get_event_loop().run_until_complete(self.asyncTurnOnByDeviceID(deviceId))
 
     async def asyncTurnOnByDeviceID(self, deviceId):
-        for y in [z for z in self._features if z["deviceId"] == deviceId]:
-            if y["attributes"]["type"] == "switch":
-                featureId = y["featureId"]
+        y = self.getDeviceByID(deviceId)
+        featureId = y.features["switch"][0]
         await self.async_writeFeature(featureId, 1)
 
     def turnOffByDeviceID(self, deviceId):
         return asyncio.get_event_loop().run_until_complete(self.asyncTurnOffByDeviceID(deviceId))
 
     async def asyncTurnOffByDeviceID(self, deviceId):
-        for y in [z for z in self._features if z["deviceId"] == deviceId]:
-            if y["attributes"]["type"] == "switch":
-                featureId = y["featureId"]
-        await self.async_writeFeature(featureId, 0)
+        y = self.getDeviceByID(deviceId)
+        featureId = y.features["switch"][0]
+        await self.async_writeFeature(featureId, 1)
 
     def setBrightnessByDeviceID(self, deviceId, level):
         return asyncio.get_event_loop().run_until_complete(self.asyncSetBrightnessByDeviceID(deviceId, level))
 
     async def asyncSetBrightnessByDeviceID(self, deviceId, level):
-        for y in [z for z in self._features if z["deviceId"] == deviceId]:
-            if y["attributes"]["type"] == "dimLevel":
-                featureId = y["featureId"]
-        await self.async_writeFeature(featureId, level)
-
-    def isSwitch(self, device):
-        switch = False
-        dimmable = False
-        for y in [z for z in self._features if z["deviceId"] == device["deviceId"]]:
-            if y["attributes"]["type"] == "switch":
-                switch = True
-            if y["attributes"]["type"] == "dimLevel":
-                dimmable = True
-        return switch and not dimmable
+        y = self.getDeviceByID(deviceId)
+        featureId = y.features["dimLevel"][0]
+        await self.async_writeFeature(featureId, 1)
 
     def getSwitches(self):
         temp = []
-        for x in self._devices:
-            if self.isSwitch(x):
-                temp.append((x["deviceId"], x["name"]))
+        for x in self.devices:
+            if x.isSwitch():
+                temp.append((x.deviceId, x.name))
         return temp
-
-    def isLight(self, device):
-        dimmable = False
-        for y in [z for z in self._features if z["deviceId"] == device["deviceId"]]:
-            if y["attributes"]["type"] == "dimLevel":
-                dimmable = True
-        return dimmable
 
     def getLights(self):
         temp = []
-        for x in self._devices:
-            if self.isLight(x):
-                temp.append((x["deviceId"], x["name"]))
+        for x in self.devices:
+            if x.isLight():
+                temp.append((x.deviceId, x.name))
         return temp
 
-    async def async_readFeature(self, featureId):
-        readmess = _LWRFMessage("feature", "read")
-        readitem = _LWRFMessageItem({"featureId": featureId})
-        readmess.additem(readitem)
-        await self._async_sendmessage(readmess)
+#########################################################
+#Connection
+#########################################################
 
-    async def authenticate(self):
-        accesstoken = self.getAccessToken()
+    def connect(self):
+        return asyncio.get_event_loop().run_until_complete(self.async_connect())
 
-        authpayload = _LWRFMessageItem({"token": accesstoken, "clientDeviceId": self._device_id})
-        authmess = _LWRFMessage("user", "authenticate")
-        authmess.additem(authpayload)
+    async def async_connect(self):
+        self._websocket = await websockets.connect(TRANS_SERVER, ssl=True)
+        asyncio.ensure_future(self._consumer_handler())
+        return await self._authenticate()
 
-        await self._async_sendmessage(authmess)
+    async def _authenticate(self):
+        accesstoken = self._getAccessToken()
+        if accesstoken:
+            authmess = _LWRFMessage("user", "authenticate")
+            authpayload = _LWRFMessageItem({"token": accesstoken, "clientDeviceId": self._device_id})
+            authmess.additem(authpayload)
+            return await self._async_sendmessage(authmess)
+        else:
+            return None
 
-    def getAccessToken(self):
+    def _getAccessToken(self):
 
         authentication = {"email":self._username, "password":self._password, "version": VERSION}
         req = requests.post(AUTH_SERVER,
                             headers={"x-lwrf-appid": "ios-01"},
                             json=authentication)
 
-        #TODO test for errors here - seems to be a 404 if pw not right
+        if req.status_code == 200:
+            token = req.json()["tokens"]["access_token"]
+        else:
+            token = None
 
-        return req.json()["tokens"]["access_token"]
+        return token
 
 
