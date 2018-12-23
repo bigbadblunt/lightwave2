@@ -222,6 +222,14 @@ class LWLink2:
         feature_id = y.features["dimLevel"][0]
         await self.async_write_feature(feature_id, level)
 
+    def set_temperature_by_device_id(self, device_id, level):
+        return asyncio.get_event_loop().run_until_complete(self.async_set_temperature_by_device_id(device_id, level))
+
+    async def async_set_temperature_by_device_id(self, device_id, level):
+        y = self.get_device_by_id(device_id)
+        feature_id = y.features["targetTemperature"][0]
+        await self.async_write_feature(feature_id, int(level*10))
+
     def get_switches(self):
         temp = []
         for x in self.devices:
