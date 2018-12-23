@@ -47,10 +47,11 @@ class _LWRFDevice:
     def __init__(self):
         self.device_id = None
         self.name = None
-        self.productCode = None
+        self.product_code = None
         self.features = {}
         self._switchable = False
         self._dimmable = False
+        self._climate = False
 
     def is_switch(self):
         return self._switchable and not self._dimmable
@@ -58,6 +59,8 @@ class _LWRFDevice:
     def is_light(self):
         return self._dimmable
 
+    def is_climate(self):
+        return self._climate
 
 class LWLink2:
 
@@ -148,7 +151,7 @@ class LWLink2:
                 new_device = _LWRFDevice()
                 new_device.device_id = x["deviceId"]
                 new_device.name = x["name"]
-                new_device.productCode = x["productCode"]
+                new_device.product_code = x["productCode"]
                 self.devices.append(new_device)
             for x in list(response["items"][0]["payload"]["features"].values()):
                 y = self.get_device_by_id(x["deviceId"])
@@ -157,8 +160,10 @@ class LWLink2:
                     y._switchable = True
                 if x["attributes"]["type"] == "dimLevel":
                     y._dimmable = True
+                if x["attributes"]["type"] == "targetTemperature":
+                    y._climate = True
 
-            # TODO - work out if I caer about "group"/"hierarchy"
+            # TODO - work out if I care about "group"/"hierarchy"
 
     def update_device_states(self):
         return asyncio.get_event_loop().run_until_complete(self.async_update_device_states())
@@ -228,6 +233,13 @@ class LWLink2:
         temp = []
         for x in self.devices:
             if x.is_light():
+                temp.append((x.device_id, x.name))
+        return temp
+
+    def get_climates(self):
+        temp = []
+        for x in self.devices:
+            if x.is_climate():
                 temp.append((x.device_id, x.name))
         return temp
 
