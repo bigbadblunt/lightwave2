@@ -69,7 +69,7 @@ class LWLink2:
         self._password = password
         self._device_id = str(uuid.uuid4())
         self._websocket = None
-        self._callback = None
+        self._callback = []
         self.devices = []
 
         # Next three variables are used to synchronise responses to requests
@@ -116,13 +116,13 @@ class LWLink2:
                     message["items"][0]["payload"]["_feature"][
                            "featureId"]
                 self.get_device_by_id(device_id).features[feature][1] = value
-                if self._callback:
-                    yield from self._callback()
+                for func in self._callback:
+                    yield from func()
             else:
                 _LOGGER.warning("Received unhandled message: %s", message)
 
     async def async_register_callback(self, callback):
-        self._callback = callback
+        self._callback.append(callback)
 
     def get_hierarchy(self):
         return asyncio.get_event_loop().run_until_complete(self.async_get_hierarchy())
