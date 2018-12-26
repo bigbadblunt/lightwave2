@@ -77,50 +77,67 @@ class LWLink2:
         self._waitingforresponse = asyncio.Event()
         self._response = None
 
+        asyncio.ensure_future(self._consumer_handler())
+
     def _sendmessage(self, message):
         return asyncio.get_event_loop().run_until_complete(self._async_sendmessage(message))
 
     async def _async_sendmessage(self, message):
         # await self.outgoing.put(message)
         _LOGGER.debug("Sending: %s", message.json())
-        await self._websocket.send(message.json())
-        self._transaction = message._message["transactionId"]
-        self._waitingforresponse.clear()
-        await self._waitingforresponse.wait()
-        _LOGGER.debug("Response: %s", str(self._response))
-        return self._response
+        try:
+            test = await self._websocket.send(message.json())
+            self._transaction = message._message["transactionId"]
+            self._waitingforresponse.clear()
+            print("Waiting for response")
+            await self._waitingforresponse.wait()
+            _LOGGER.debug("Response received: %s", str(self._response))
+            return self._response
+        except:
+            _LOGGER.debug("Connection Closed in send_message")
+            await self.async_connect()
+            _LOGGER.debug("Connection reopened")
 
     # Use asyncio.coroutine for compatibility with Python 3.5
     @asyncio.coroutine
     def _consumer_handler(self):
         while True:
-            jsonmessage = yield from self._websocket.recv()
-            message = json.loads(jsonmessage)
-            _LOGGER.debug("Received %s", message)
-            # Some transaction IDs don't work, this is a workaround
-            if message["class"] == "feature" and (message["operation"] == "write" or message["operation"] == "read"):
-                message["transactionId"] = message["items"][0]["itemId"]
-            # now parse the message
-            if message["transactionId"] == self._transaction:
+            try:
+                jsonmessage = yield from self._websocket.recv()
+                message = json.loads(jsonmessage)
+                _LOGGER.warning("Received %s", message)
+                # Some transaction IDs don't work, this is a workaround
+                if message["class"] == "feature" and (message["operation"] == "write" or message["operation"] == "read"):
+                    message["transactionId"] = message["items"][0]["itemId"]
+                # now parse the message
+                if message["transactionId"] == self._transaction:
+                    self._waitingforresponse.set()
+                    self._transactions = None
+                    self._response = message
+                elif message["direction"] == "notification" and message["class"] == "group" \
+                        and message["operation"] == "event":
+                    yield from self.async_get_hierarchy()
+                elif message["direction"] == "notification" and message["operation"] == "event":
+                    device_id = message["items"][0]["payload"]["_feature"]["deviceId"]
+                    feature = message["items"][0]["payload"]["_feature"]["featureType"]
+                    value = message["items"][0]["payload"]["value"]
+                    assert self.get_device_by_id(device_id).features[feature][0] == \
+                        message["items"][0]["payload"]["_feature"][
+                               "featureId"]
+                    self.get_device_by_id(device_id).features[feature][1] = value
+                    _LOGGER.debug("Calling callbacks %s", self._callback)
+                    for func in self._callback:
+                        func()
+                else:
+                    _LOGGER.warning("Received unhandled message: %s", message)
+            except AttributeError: #_websocket is None if not set up, just wait for a while
+                yield from asyncio.sleep(1)
+            except websockets.ConnectionClosed:
+                #We're not going to get a reponse to whatever we sent last, so clear response flag
                 self._waitingforresponse.set()
                 self._transactions = None
-                self._response = message
-            elif message["direction"] == "notification" and message["class"] == "group" \
-                    and message["operation"] == "event":
-                yield from self.async_get_hierarchy()
-            elif message["direction"] == "notification" and message["operation"] == "event":
-                device_id = message["items"][0]["payload"]["_feature"]["deviceId"]
-                feature = message["items"][0]["payload"]["_feature"]["featureType"]
-                value = message["items"][0]["payload"]["value"]
-                assert self.get_device_by_id(device_id).features[feature][0] == \
-                    message["items"][0]["payload"]["_feature"][
-                           "featureId"]
-                self.get_device_by_id(device_id).features[feature][1] = value
-                _LOGGER.debug("Calling callbacks %s", self._callback)
-                for func in self._callback:
-                    func()
-            else:
-                _LOGGER.warning("Received unhandled message: %s", message)
+                self._response = None
+                yield from asyncio.sleep(1)
 
     async def async_register_callback(self, callback):
         _LOGGER.debug("Register callback %s", callback)
@@ -266,10 +283,16 @@ class LWLink2:
     def connect(self):
         return asyncio.get_event_loop().run_until_complete(self.async_connect())
 
-    async def async_connect(self):
-        self._websocket = await websockets.connect(TRANS_SERVER, ssl=True)
-        asyncio.ensure_future(self._consumer_handler())
-        return await self._authenticate()
+    async def async_connect(self, tries=0):
+        #TODO: add decaying retry
+        try:
+            self._websocket = await websockets.connect(TRANS_SERVER, ssl=True)
+            return await self._authenticate()
+        except Exception as exp:
+            retry_delay = 2 ** (tries + 1)
+            _LOGGER.warning("Cannot connect (exception '{}'). Waiting {} seconds".format(exp, retry_delay))
+            await asyncio.sleep(retry_delay)
+            return await self.async_connect(tries + 1)
 
     async def _authenticate(self):
         accesstoken = self._get_access_token()
@@ -291,6 +314,7 @@ class LWLink2:
         if req.status_code == 200:
             token = req.json()["tokens"]["access_token"]
         else:
+            _LOGGER.warning("No authentication token (status_code '{}').".format(req.status_code))
             token = None
 
         return token
