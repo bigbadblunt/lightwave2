@@ -118,7 +118,7 @@ class LWLink2:
                 self.get_device_by_id(device_id).features[feature][1] = value
                 _LOGGER.debug("Calling callbacks %s", self._callback)
                 for func in self._callback:
-                    yield from func()
+                    func()
             else:
                 _LOGGER.warning("Received unhandled message: %s", message)
 
