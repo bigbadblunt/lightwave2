@@ -116,12 +116,14 @@ class LWLink2:
                     message["items"][0]["payload"]["_feature"][
                            "featureId"]
                 self.get_device_by_id(device_id).features[feature][1] = value
+                _LOGGER.debug("Calling callbacks %s", self._callback)
                 for func in self._callback:
                     yield from func()
             else:
                 _LOGGER.warning("Received unhandled message: %s", message)
 
     async def async_register_callback(self, callback):
+        _LOGGER.debug("Register callback %s", callback)
         self._callback.append(callback)
 
     def get_hierarchy(self):
