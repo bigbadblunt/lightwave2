@@ -84,17 +84,23 @@ class LWLink2:
 
     async def _async_sendmessage(self, message):
         # await self.outgoing.put(message)
+
+        if not self._websocket:
+            _LOGGER.debug("No websocket (pre send), reconnecting in send_message")
+            await self.async_connect()
+            _LOGGER.debug("Connection reopened")
+
         _LOGGER.debug("Sending: %s", message.json())
-        try:
-            test = await self._websocket.send(message.json())
-            self._transaction = message._message["transactionId"]
-            self._waitingforresponse.clear()
-            print("Waiting for response")
-            await self._waitingforresponse.wait()
-            _LOGGER.debug("Response received: %s", str(self._response))
+        test = await self._websocket.send(message.json())
+        self._transaction = message._message["transactionId"]
+        self._waitingforresponse.clear()
+        await self._waitingforresponse.wait()
+        _LOGGER.debug("Response received: %s", str(self._response))
+
+        if self._response:
             return self._response
-        except:
-            _LOGGER.debug("Connection Closed in send_message")
+        else:
+            _LOGGER.debug("No websocket (post send), reconnecting in send_message")
             await self.async_connect()
             _LOGGER.debug("Connection reopened")
 
@@ -133,10 +139,11 @@ class LWLink2:
             except AttributeError: #_websocket is None if not set up, just wait for a while
                 yield from asyncio.sleep(1)
             except websockets.ConnectionClosed:
-                #We're not going to get a reponse to whatever we sent last, so clear response flag
+                #We're not going to get a reponse, so clear response flag to allow _send_message to unblock
                 self._waitingforresponse.set()
                 self._transactions = None
                 self._response = None
+                self._websocket = None
                 yield from asyncio.sleep(1)
 
     async def async_register_callback(self, callback):
@@ -284,12 +291,11 @@ class LWLink2:
         return asyncio.get_event_loop().run_until_complete(self.async_connect())
 
     async def async_connect(self, tries=0):
-        #TODO: add decaying retry
         try:
             self._websocket = await websockets.connect(TRANS_SERVER, ssl=True)
             return await self._authenticate()
         except Exception as exp:
-            retry_delay = 2 ** (tries + 1)
+            retry_delay = min(2 ** (tries + 1), 120)
             _LOGGER.warning("Cannot connect (exception '{}'). Waiting {} seconds".format(exp, retry_delay))
             await asyncio.sleep(retry_delay)
             return await self.async_connect(tries + 1)
