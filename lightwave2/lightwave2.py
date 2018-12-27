@@ -111,7 +111,7 @@ class LWLink2:
             try:
                 jsonmessage = yield from self._websocket.recv()
                 message = json.loads(jsonmessage)
-                _LOGGER.warning("Received %s", message)
+                _LOGGER.debug("Received %s", message)
                 # Some transaction IDs don't work, this is a workaround
                 if message["class"] == "feature" and (message["operation"] == "write" or message["operation"] == "read"):
                     message["transactionId"] = message["items"][0]["itemId"]
