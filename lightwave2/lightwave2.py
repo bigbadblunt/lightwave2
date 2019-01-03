@@ -124,16 +124,19 @@ class LWLink2:
                         and message["operation"] == "event":
                     yield from self.async_get_hierarchy()
                 elif message["direction"] == "notification" and message["operation"] == "event":
-                    device_id = message["items"][0]["payload"]["_feature"]["deviceId"]
-                    feature = message["items"][0]["payload"]["_feature"]["featureType"]
-                    value = message["items"][0]["payload"]["value"]
-                    assert self.get_device_by_id(device_id).features[feature][0] == \
-                        message["items"][0]["payload"]["_feature"][
-                               "featureId"]
-                    self.get_device_by_id(device_id).features[feature][1] = value
-                    _LOGGER.debug("Calling callbacks %s", self._callback)
-                    for func in self._callback:
-                        func()
+                    if "_feature" in message["items"][0]["payload"]:
+                        device_id = message["items"][0]["payload"]["_feature"]["deviceId"]
+                        feature = message["items"][0]["payload"]["_feature"]["featureType"]
+                        value = message["items"][0]["payload"]["value"]
+                        assert self.get_device_by_id(device_id).features[feature][0] == \
+                            message["items"][0]["payload"]["_feature"][
+                                   "featureId"]
+                        self.get_device_by_id(device_id).features[feature][1] = value
+                        _LOGGER.debug("Calling callbacks %s", self._callback)
+                        for func in self._callback:
+                            func()
+                    else:
+                        _LOGGER.warning("Message with no _feature: %s", message)
                 else:
                     _LOGGER.warning("Received unhandled message: %s", message)
             except AttributeError: #_websocket is None if not set up, just wait for a while
