@@ -11,6 +11,7 @@ _LOGGER = logging.getLogger(__name__)
 AUTH_SERVER = "https://auth.lightwaverf.com/v2/lightwaverf/autouserlogin/lwapps"
 TRANS_SERVER = "wss://v1-linkplus-app.lightwaverf.com"
 VERSION = "1.6.8"
+MAX_RETRIES = 5
 
 
 class _LWRFMessage:
@@ -52,6 +53,7 @@ class _LWRFDevice:
         self._switchable = False
         self._dimmable = False
         self._climate = False
+        self._gen2 = False
 
     def is_switch(self):
         return self._switchable and not self._dimmable
@@ -61,6 +63,9 @@ class _LWRFDevice:
 
     def is_climate(self):
         return self._climate
+
+    def is_gen2(self):
+        return self._gen2
 
 class LWLink2:
 
@@ -82,11 +87,11 @@ class LWLink2:
     def _sendmessage(self, message):
         return asyncio.get_event_loop().run_until_complete(self._async_sendmessage(message))
 
-    async def _async_sendmessage(self, message):
+    async def _async_sendmessage(self, message, _retry = 1):
         # await self.outgoing.put(message)
 
         if not self._websocket:
-            _LOGGER.debug("No websocket (pre send), reconnecting in send_message")
+            _LOGGER.debug("Can't send (websocket closed), reconnecting")
             await self.async_connect()
             _LOGGER.debug("Connection reopened")
 
@@ -99,10 +104,13 @@ class LWLink2:
 
         if self._response:
             return self._response
+        elif _retry >= MAX_RETRIES:
+            return None
         else:
-            _LOGGER.debug("No websocket (post send), reconnecting in send_message")
+            _LOGGER.debug("Send may have failed (websocket closed), reconnecting")
             await self.async_connect()
-            _LOGGER.debug("Connection reopened")
+            _LOGGER.debug("Connection reopened, resending message (attempt %s)", _retry + 1)
+            return await self._async_sendmessage(message, _retry+1)
 
     # Use asyncio.coroutine for compatibility with Python 3.5
     @asyncio.coroutine
@@ -197,6 +205,8 @@ class LWLink2:
                     y._dimmable = True
                 if x["attributes"]["type"] == "targetTemperature":
                     y._climate = True
+                if x["attributes"]["type"] == "identify":
+                    y._gen2 = True
 
             # TODO - work out if I care about "group"/"hierarchy"
 
