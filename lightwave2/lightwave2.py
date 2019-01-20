@@ -165,6 +165,7 @@ class LWLink2:
         return asyncio.get_event_loop().run_until_complete(self.async_get_hierarchy())
 
     async def async_get_hierarchy(self):
+        _LOGGER.debug("Reading hierarchy")
         readmess = _LWRFMessage("user", "rootGroups")
         readitem = _LWRFMessageItem()
         readmess.additem(readitem)
@@ -172,6 +173,7 @@ class LWLink2:
 
         for item in response["items"]:
             group_ids = item["payload"]["groupIds"]
+            _LOGGER.debug("Reading groups {}".format(group_ids))
             await self._async_read_groups(group_ids)
 
         await self.async_update_device_states()
@@ -191,6 +193,7 @@ class LWLink2:
 
             self.devices = []
             for x in list(response["items"][0]["payload"]["devices"].values()):
+                _LOGGER.debug("Adding device {}".format(x))
                 new_device = _LWRFDevice()
                 new_device.device_id = x["deviceId"]
                 new_device.name = x["name"]
