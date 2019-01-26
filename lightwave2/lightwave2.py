@@ -191,7 +191,7 @@ class LWLink2:
             self.devices = []
             for x in list(response["items"][0]["payload"]["devices"].values()):
                 for y in x["featureSetGroupIds"]:
-                    _LOGGER.debug("Adding device {}".format(x))
+                    _LOGGER.debug("Creating device {}".format(x))
                     new_device = _LWRFDevice()
                     new_device.device_id = y
                     new_device.product_code = x["productCode"]
@@ -206,15 +206,13 @@ class LWLink2:
                                                             "subgroupDepth": 10})
                     readmess.additem(readitem)
                     featgroupresponse = await self._async_sendmessage(readmess)
+                    new_device.name = featgroupresponse["items"][0]["payload"]["name"]
+                    self.devices.append(new_device)
 
-
-                new_device.name = x["name"]
-
-                self.devices.append(new_device)
             for x in list(response["items"][0]["payload"]["features"].values()):
                 for z in x["groups"]:
+                    _LOGGER.debug("Adding device features {}".format(x))
                     y = self.get_device_by_id(z)
-                    y.name = x["attributes"]["name"]
                     y.features[x["attributes"]["type"]] = [x["featureId"], x["attributes"]["value"]]
                     if x["attributes"]["type"] == "switch":
                         y._switchable = True
