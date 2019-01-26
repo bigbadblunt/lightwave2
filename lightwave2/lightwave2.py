@@ -133,13 +133,10 @@ class LWLink2:
                     yield from self.async_get_hierarchy()
                 elif message["direction"] == "notification" and message["operation"] == "event":
                     if "_feature" in message["items"][0]["payload"]:
-                        device_id = message["items"][0]["payload"]["_feature"]["deviceId"]
+                        feature_id = message["items"][0]["payload"]["_feature"]["featureId"]
                         feature = message["items"][0]["payload"]["_feature"]["featureType"]
                         value = message["items"][0]["payload"]["value"]
-                        assert self.get_device_by_id(device_id).features[feature][0] == \
-                            message["items"][0]["payload"]["_feature"][
-                                   "featureId"]
-                        self.get_device_by_id(device_id).features[feature][1] = value
+                        self.get_device_by_featureid(feature_id).features[feature][1] = value
                         _LOGGER.debug("Calling callbacks %s", self._callback)
                         for func in self._callback:
                             func()
@@ -193,23 +190,40 @@ class LWLink2:
 
             self.devices = []
             for x in list(response["items"][0]["payload"]["devices"].values()):
-                _LOGGER.debug("Adding device {}".format(x))
-                new_device = _LWRFDevice()
-                new_device.device_id = x["deviceId"]
+                for y in x["featureSetGroupIds"]:
+                    _LOGGER.debug("Adding device {}".format(x))
+                    new_device = _LWRFDevice()
+                    new_device.device_id = y
+                    new_device.product_code = x["productCode"]
+
+                    readmess = _LWRFMessage("group", "read")
+                    readitem = _LWRFMessageItem({"groupId": y,
+                                                            "blocks": True,
+                                                            "devices": True,
+                                                            "features": True,
+                                                            "scripts": True,
+                                                            "subgroups": True,
+                                                            "subgroupDepth": 10})
+                    readmess.additem(readitem)
+                    featgroupresponse = await self._async_sendmessage(readmess)
+
+
                 new_device.name = x["name"]
-                new_device.product_code = x["productCode"]
+
                 self.devices.append(new_device)
             for x in list(response["items"][0]["payload"]["features"].values()):
-                y = self.get_device_by_id(x["deviceId"])
-                y.features[x["attributes"]["type"]] = [x["featureId"], x["attributes"]["value"]]
-                if x["attributes"]["type"] == "switch":
-                    y._switchable = True
-                if x["attributes"]["type"] == "dimLevel":
-                    y._dimmable = True
-                if x["attributes"]["type"] == "targetTemperature":
-                    y._climate = True
-                if x["attributes"]["type"] == "identify":
-                    y._gen2 = True
+                for z in x["groups"]:
+                    y = self.get_device_by_id(z)
+                    y.name = x["attributes"]["name"]
+                    y.features[x["attributes"]["type"]] = [x["featureId"], x["attributes"]["value"]]
+                    if x["attributes"]["type"] == "switch":
+                        y._switchable = True
+                    if x["attributes"]["type"] == "dimLevel":
+                        y._dimmable = True
+                    if x["attributes"]["type"] == "targetTemperature":
+                        y._climate = True
+                    if x["attributes"]["type"] == "identify":
+                        y._gen2 = True
 
             # TODO - work out if I care about "group"/"hierarchy"
 
@@ -244,6 +258,13 @@ class LWLink2:
         for x in self.devices:
             if x.device_id == device_id:
                 return x
+        return None
+
+    def get_device_by_featureid(self, id):
+        for x in self.devices:
+            for y in x.features.values():
+                if y[0] == id:
+                    return x
         return None
 
     def turn_on_by_device_id(self, device_id):
