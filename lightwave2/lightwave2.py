@@ -74,6 +74,7 @@ class LWLink2:
         self._username = username
         self._password = password
         self._device_id = str(uuid.uuid4())
+        self._authtoken = None
         self._websocket = None
         self._callback = []
         self.devices = []
@@ -150,7 +151,7 @@ class LWLink2:
             except AttributeError:  # websocket is None if not set up, just wait for a while
                 yield from asyncio.sleep(1)
             except websockets.ConnectionClosed:
-                # We're not going to get a reponse, so clear response flag to allow _send_message to unblock
+                # We're not going to get a response, so clear response flag to allow _send_message to unblock
                 _LOGGER.debug("Websocket closed in message handler")
                 self._waitingforresponse.set()
                 self._transactions = None
@@ -331,7 +332,8 @@ class LWLink2:
 
     async def async_connect(self, tries=0):
         try:
-            self._websocket = await websockets.connect(TRANS_SERVER, ssl=True)
+            if not self._websocket or not self._websocket.open:
+                self._websocket = await websockets.connect(TRANS_SERVER, ssl=True)
             return await self._authenticate()
         except Exception as exp:
             retry_delay = min(2 ** (tries + 1), 120)
@@ -340,26 +342,39 @@ class LWLink2:
             return await self.async_connect(tries + 1)
 
     async def _authenticate(self):
-        accesstoken = self._get_access_token()
-        if accesstoken:
+        if not self._authtoken:
+            self._authtoken = self._get_access_token()
+        if self._authtoken:
             authmess = _LWRFMessage("user", "authenticate")
-            authpayload = _LWRFMessageItem({"token": accesstoken, "clientDeviceId": self._device_id})
+            authpayload = _LWRFMessageItem({"token": self._authtoken, "clientDeviceId": self._device_id})
             authmess.additem(authpayload)
-            return await self._async_sendmessage(authmess)
+            response = await self._async_sendmessage(authmess)
+            if not response["items"][0]["success"]:
+                if response["items"][0]["error"]["code"] == "200":
+                    #"Channel is already authenticated" - Do nothing
+                    pass
+                elif response["items"][0]["error"]["code"] == 405:
+                    #"Access denied" - bogus token, let's reauthenticate
+                    #Lightwave seems to return a string for 200 but an int for 405!
+                    _LOGGER.debug("Authentication token rejected, regenerating and reauthenticating")
+                    self._authtoken = None
+                    await self._authenticate()
+                else:
+                    _LOGGER.debug("Unhandled authentication error {}".format(response["items"][0]["error"]["message"]))
+            return response
         else:
             return None
 
     def _get_access_token(self):
-
+        _LOGGER.debug("Requesting authentication token")
         authentication = {"email": self._username, "password": self._password, "version": VERSION}
         req = requests.post(AUTH_SERVER,
                             headers={"x-lwrf-appid": "ios-01"},
                             json=authentication)
-
+        _LOGGER.debug("Received response: {}".format(req))
         if req.status_code == 200:
             token = req.json()["tokens"]["access_token"]
         else:
             _LOGGER.warning("No authentication token (status_code '{}').".format(req.status_code))
-            token = None
-
+            raise ConnectionError("No authentication token: {}".format(req.text))
         return token
