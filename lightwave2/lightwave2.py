@@ -67,6 +67,7 @@ class _LWRFDevice:
     def is_gen2(self):
         return self._gen2
 
+
 class LWLink2:
 
     def __init__(self, username, password):
@@ -87,7 +88,7 @@ class LWLink2:
     def _sendmessage(self, message):
         return asyncio.get_event_loop().run_until_complete(self._async_sendmessage(message))
 
-    async def _async_sendmessage(self, message, _retry = 1):
+    async def _async_sendmessage(self, message, _retry=1):
         # await self.outgoing.put(message)
 
         if not self._websocket:
@@ -96,7 +97,7 @@ class LWLink2:
             _LOGGER.debug("Connection reopened")
 
         _LOGGER.debug("Sending: %s", message.json())
-        test = await self._websocket.send(message.json())
+        await self._websocket.send(message.json())
         self._transaction = message._message["transactionId"]
         self._waitingforresponse.clear()
         await self._waitingforresponse.wait()
@@ -105,12 +106,13 @@ class LWLink2:
         if self._response:
             return self._response
         elif _retry >= MAX_RETRIES:
+            _LOGGER.debug("Exceeding MAX_RETRIES, abandoning send")
             return None
         else:
             _LOGGER.debug("Send may have failed (websocket closed), reconnecting")
             await self.async_connect()
             _LOGGER.debug("Connection reopened, resending message (attempt %s)", _retry + 1)
-            return await self._async_sendmessage(message, _retry+1)
+            return await self._async_sendmessage(message, _retry + 1)
 
     # Use asyncio.coroutine for compatibility with Python 3.5
     @asyncio.coroutine
@@ -121,7 +123,8 @@ class LWLink2:
                 message = json.loads(jsonmessage)
                 _LOGGER.debug("Received %s", message)
                 # Some transaction IDs don't work, this is a workaround
-                if message["class"] == "feature" and (message["operation"] == "write" or message["operation"] == "read"):
+                if message["class"] == "feature" and (
+                        message["operation"] == "write" or message["operation"] == "read"):
                     message["transactionId"] = message["items"][0]["itemId"]
                 # now parse the message
                 if message["transactionId"] == self._transaction:
@@ -144,10 +147,11 @@ class LWLink2:
                         _LOGGER.warning("Message with no _feature: %s", message)
                 else:
                     _LOGGER.warning("Received unhandled message: %s", message)
-            except AttributeError: #_websocket is None if not set up, just wait for a while
+            except AttributeError:  # websocket is None if not set up, just wait for a while
                 yield from asyncio.sleep(1)
             except websockets.ConnectionClosed:
-                #We're not going to get a reponse, so clear response flag to allow _send_message to unblock
+                # We're not going to get a reponse, so clear response flag to allow _send_message to unblock
+                _LOGGER.debug("Websocket closed in message handler")
                 self._waitingforresponse.set()
                 self._transactions = None
                 self._response = None
@@ -198,12 +202,12 @@ class LWLink2:
 
                     readmess = _LWRFMessage("group", "read")
                     readitem = _LWRFMessageItem({"groupId": y,
-                                                            "blocks": True,
-                                                            "devices": True,
-                                                            "features": True,
-                                                            "scripts": True,
-                                                            "subgroups": True,
-                                                            "subgroupDepth": 10})
+                                                 "blocks": True,
+                                                 "devices": True,
+                                                 "features": True,
+                                                 "scripts": True,
+                                                 "subgroups": True,
+                                                 "subgroupDepth": 10})
                     readmess.additem(readitem)
                     featgroupresponse = await self._async_sendmessage(readmess)
                     new_device.name = featgroupresponse["items"][0]["payload"]["name"]
@@ -258,10 +262,10 @@ class LWLink2:
                 return x
         return None
 
-    def get_device_by_featureid(self, id):
+    def get_device_by_featureid(self, feat_id):
         for x in self.devices:
             for y in x.features.values():
-                if y[0] == id:
+                if y[0] == feat_id:
                     return x
         return None
 
@@ -295,7 +299,7 @@ class LWLink2:
     async def async_set_temperature_by_device_id(self, device_id, level):
         y = self.get_device_by_id(device_id)
         feature_id = y.features["targetTemperature"][0]
-        await self.async_write_feature(feature_id, int(level*10))
+        await self.async_write_feature(feature_id, int(level * 10))
 
     def get_switches(self):
         temp = []
