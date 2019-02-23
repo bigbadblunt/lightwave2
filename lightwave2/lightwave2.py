@@ -387,21 +387,6 @@ class LWLink2Public:
         self._token_expiry = None
         self.featuresets = []
 
-    def _get_access_token(self):
-        _LOGGER.debug("Requesting authentication token")
-        authentication = {"grant_type": "refresh_token", "refresh_token": self._refresh_token}
-        req = requests.post(PUBLIC_AUTH_SERVER,
-                            headers={"authorization": "basic " + self._api_token},
-                            json=authentication)
-        _LOGGER.debug("Received response: {}".format(req))
-        if req.status_code == 200:
-            self._access_token = req.json()["access_token"]
-            self._refresh_token = req.json()["refresh_token"]
-            self._token_expiry = datetime.datetime.now() + datetime.timedelta(seconds = req.json()["expires_in"])
-        else:
-            _LOGGER.warning("No authentication token (status_code '{}').".format(req.status_code))
-            raise ConnectionError("No authentication token: {}".format(req.text))
-
     def get_hierarchy(self):
         return asyncio.get_event_loop().run_until_complete(self.async_get_hierarchy())
 
@@ -536,3 +521,35 @@ class LWLink2Public:
             if x.is_climate():
                 temp.append((x.featureset_id, x.name))
         return temp
+
+    #########################################################
+    # Connection
+    #########################################################
+
+    def connect(self):
+        return asyncio.get_event_loop().run_until_complete(self.async_connect())
+
+    async def async_connect(self, tries=0):
+        try:
+            return await self._get_access_token()
+        except Exception as exp:
+            retry_delay = min(2 ** (tries + 1), 120)
+            _LOGGER.warning("Cannot connect (exception '{}'). Waiting {} seconds".format(exp, retry_delay))
+            await asyncio.sleep(retry_delay)
+            return await self.async_connect(tries + 1)
+    #TODO distinguish failure on no token and don't retry
+
+    def _get_access_token(self):
+        _LOGGER.debug("Requesting authentication token")
+        authentication = {"grant_type": "refresh_token", "refresh_token": self._refresh_token}
+        req = requests.post(PUBLIC_AUTH_SERVER,
+                            headers={"authorization": "basic " + self._api_token},
+                            json=authentication)
+        _LOGGER.debug("Received response: {}".format(req))
+        if req.status_code == 200:
+            self._access_token = req.json()["access_token"]
+            self._refresh_token = req.json()["refresh_token"]
+            self._token_expiry = datetime.datetime.now() + datetime.timedelta(seconds=req.json()["expires_in"])
+        else:
+            _LOGGER.warning("No authentication token (status_code '{}').".format(req.status_code))
+            raise ConnectionError("No authentication token: {}".format(req.text))
