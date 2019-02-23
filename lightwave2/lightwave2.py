@@ -517,7 +517,7 @@ class LWLink2Public:
 
     def get_climates(self):
         temp = []
-        for x in self.featureset:
+        for x in self.featuresets:
             if x.is_climate():
                 temp.append((x.featureset_id, x.name))
         return temp
