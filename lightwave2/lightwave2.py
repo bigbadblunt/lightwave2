@@ -539,7 +539,7 @@ class LWLink2Public:
             return await self.async_connect(tries + 1)
     #TODO distinguish failure on no token and don't retry
 
-    def _get_access_token(self):
+    async def _get_access_token(self):
         _LOGGER.debug("Requesting authentication token")
         authentication = {"grant_type": "refresh_token", "refresh_token": self._refresh_token}
         req = requests.post(PUBLIC_AUTH_SERVER,
