@@ -14,6 +14,7 @@ TRANS_SERVER = "wss://v1-linkplus-app.lightwaverf.com"
 VERSION = "1.6.8"
 MAX_RETRIES = 5
 PUBLIC_AUTH_SERVER = "https://auth.lightwaverf.com/token"
+PUBLIC_API = "https://publicapi.lightwaverf.com/v1/"
 
 class _LWRFMessage:
     _tran_id = 0
@@ -43,7 +44,6 @@ class _LWRFMessageItem:
         _LWRFMessageItem._item_id += 1
         self._item["payload"] = payload
 
-
 class _LWRFFeatureSet:
 
     def __init__(self):
@@ -68,7 +68,6 @@ class _LWRFFeatureSet:
     def is_gen2(self):
         return self._gen2
 
-
 class LWLink2:
 
     def __init__(self, username, password):
@@ -80,6 +79,7 @@ class LWLink2:
         self._device_id = str(uuid.uuid4())
         self._websocket = None
         self._callback = []
+        self._group_ids = []
 
         # Next three variables are used to synchronise responses to requests
         self._transaction = None
@@ -89,7 +89,6 @@ class LWLink2:
         asyncio.ensure_future(self._consumer_handler())
 
     async def _async_sendmessage(self, message, _retry=1):
-        # await self.outgoing.put(message)
 
         if not self._websocket:
             _LOGGER.debug("Can't send (websocket closed), reconnecting")
@@ -169,15 +168,16 @@ class LWLink2:
         readmess.additem(readitem)
         response = await self._async_sendmessage(readmess)
 
+        self._group_ids = []
         for item in response["items"]:
-            group_ids = item["payload"]["groupIds"]
-            _LOGGER.debug("Reading groups {}".format(group_ids))
-            await self._async_read_groups(group_ids)
+            self._group_ids = self._group_ids + item["payload"]["groupIds"]
 
-        await self.async_update_featureset_states()
+        _LOGGER.debug("Reading groups {}".format(self._group_ids))
+        await self._async_read_groups()
 
-    async def _async_read_groups(self, group_ids):
-        for groupId in group_ids:
+    async def _async_read_groups(self):
+        self.featuresets = {}
+        for groupId in self._group_ids:
             readmess = _LWRFMessage("group", "read")
             readitem = _LWRFMessageItem({"groupId": groupId,
                                          "blocks": True,
@@ -189,31 +189,19 @@ class LWLink2:
             readmess.additem(readitem)
             response = await self._async_sendmessage(readmess)
 
-            self.featuresets = {}
-            for x in list(response["items"][0]["payload"]["devices"].values()):
-                for y in x["featureSetGroupIds"]:
-                    _LOGGER.debug("Creating device {}".format(x))
-                    new_featureset = _LWRFFeatureSet()
-                    new_featureset.featureset_id = y
-                    new_featureset.product_code = x["productCode"]
-
-                    readmess = _LWRFMessage("group", "read")
-                    readitem = _LWRFMessageItem({"groupId": y,
-                                                 "blocks": True,
-                                                 "devices": True,
-                                                 "features": True,
-                                                 "scripts": True,
-                                                 "subgroups": True,
-                                                 "subgroupDepth": 10})
-                    readmess.additem(readitem)
-                    featgroupresponse = await self._async_sendmessage(readmess)
-                    new_featureset.name = featgroupresponse["items"][0]["payload"]["name"]
-                    self.featuresets[y] = new_featureset
-
             for x in list(response["items"][0]["payload"]["features"].values()):
                 for z in x["groups"]:
+
+                    if z not in self.featuresets:
+                        _LOGGER.debug("Creating device {}".format(x))
+                        new_featureset = _LWRFFeatureSet()
+                        new_featureset.featureset_id = z
+                        new_featureset.product_code = "Not working" #TODO!
+                        new_featureset.name = x["name"]
+                        self.featuresets[z] = new_featureset
+
                     _LOGGER.debug("Adding device features {}".format(x))
-                    y = self.get_featureset_by_id(z)
+                    y = self.featuresets[z]
                     y.features[x["attributes"]["type"]] = [x["featureId"], x["attributes"]["value"]]
                     if x["attributes"]["type"] == "switch":
                         y._switchable = True
@@ -225,10 +213,7 @@ class LWLink2:
                         y._gen2 = True
 
     async def async_update_featureset_states(self):
-        for dummy, x in self.featuresets.items():
-            for y in x.features:
-                value = await self.async_read_feature(x.features[y][0])
-                x.features[y][1] = value["items"][0]["payload"]["value"]
+        await self._async_read_groups()
 
     async def async_write_feature(self, feature_id, value):
         readmess = _LWRFMessage("feature", "write")
@@ -391,15 +376,28 @@ class LWLink2Public(LWLink2):
         self._refresh_token = refresh_token
         self._token_expiry = None
 
+    #TODO add retries
+    #TODO make this async!
+    async def _async_getrequest(self, endpoint,  _retry=1):
+        _LOGGER.debug("Sending API GET request to {}".format(endpoint))
+        req = requests.get(PUBLIC_API + endpoint,
+                           headers={"authorization": "bearer " + self._authtoken})
+        _LOGGER.debug("Received API response {}".format(req.json()))
+        return req.json()
+
+    async def _async_postrequest(self, endpoint, body,  _retry=1):
+        _LOGGER.debug("Sending API POST request to {}: {}".format(endpoint, body))
+        req = requests.post(PUBLIC_API + endpoint,
+                            headers={"authorization": "bearer " + self._authtoken}, json=body)
+        _LOGGER.debug("Received API response {}".format(req.json()))
+        return req.json()
+
     async def async_get_hierarchy(self):
 
         self.featuresets = {}
-        req = requests.get("https://publicapi.lightwaverf.com/v1/structures",
-                           headers={"authorization": "bearer " + self._authtoken})
-        for struct in req.json()["structures"]:
-            req = requests.get("https://publicapi.lightwaverf.com/v1/structure/" + struct,
-                               headers={"authorization": "bearer " + self._authtoken})
-            response = req.json()
+        req = await self._async_getrequest("structures")
+        for struct in req["structures"]:
+            response = await self._async_getrequest("structure/" + struct)
 
             for x in response["devices"]:
                 for y in x["featureSets"]:
@@ -410,7 +408,7 @@ class LWLink2Public(LWLink2):
                     new_featureset.name = x["name"]
 
                     for z in y["features"]:
-                        _LOGGER.debug("Adding device features {}".format(x))
+                        _LOGGER.debug("Adding device features {}".format(z))
                         new_featureset.features[z["type"]] = [z["featureId"], None]
                         if z["type"] == "switch":
                             new_featureset._switchable = True
@@ -428,12 +426,22 @@ class LWLink2Public(LWLink2):
     async def async_register_callback(self, callback):
         pass
 
-    # TODO improve async_update_featureset_states - can use more feature batch read from public API
     async def async_update_featureset_states(self):
+        feature_list = []
+
         for dummy, x in self.featuresets.items():
             for y in x.features:
-                value = await self.async_read_feature(x.features[y][0])
-                x.features[y][1] = value
+                feature_list.append({"featureId":x.features[y][0]})
+        body = {"features":feature_list}
+        _LOGGER.debug("Sending API request: {}".format(body))
+        req = requests.post("https://publicapi.lightwaverf.com/v1/features/read",
+                            headers={"authorization": "bearer " + self._authtoken}, json=body)
+        _LOGGER.debug("Received API response {}".format(req.json()))
+
+        for featuresetid in self.featuresets:
+            for featurename in self.featuresets[featuresetid].features:
+                if self.featuresets[featuresetid].features[featurename][0] in req.json():
+                    self.featuresets[featuresetid].features[featurename][1] = req.json()[self.featuresets[featuresetid].features[featurename][0]]
 
     async def async_write_feature(self, feature_id, value):
         #TODO Check for expiry of auth token
@@ -463,6 +471,7 @@ class LWLink2Public(LWLink2):
             return await self.async_connect(tries + 1)
     #TODO distinguish failure on no token and don't retry
 
+    #TODO allow password auth or refresh token auth on both public and private
     async def _get_access_token(self):
         _LOGGER.debug("Requesting authentication token")
         authentication = {"grant_type": "refresh_token", "refresh_token": self._refresh_token}
