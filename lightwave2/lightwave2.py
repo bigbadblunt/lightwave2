@@ -72,7 +72,7 @@ class _LWRFFeatureSet:
 class LWLink2:
 
     def __init__(self, username, password):
-        self.featuresets = []
+        self.featuresets = {}
         self._authtoken = None
 
         self._username = username
@@ -189,7 +189,7 @@ class LWLink2:
             readmess.additem(readitem)
             response = await self._async_sendmessage(readmess)
 
-            self.featuresets = []
+            self.featuresets = {}
             for x in list(response["items"][0]["payload"]["devices"].values()):
                 for y in x["featureSetGroupIds"]:
                     _LOGGER.debug("Creating device {}".format(x))
@@ -208,7 +208,7 @@ class LWLink2:
                     readmess.additem(readitem)
                     featgroupresponse = await self._async_sendmessage(readmess)
                     new_featureset.name = featgroupresponse["items"][0]["payload"]["name"]
-                    self.featuresets.append(new_featureset)
+                    self.featuresets[y] = new_featureset
 
             for x in list(response["items"][0]["payload"]["features"].values()):
                 for z in x["groups"]:
@@ -225,7 +225,7 @@ class LWLink2:
                         y._gen2 = True
 
     async def async_update_featureset_states(self):
-        for x in self.featuresets:
+        for dummy, x in self.featuresets.items():
             for y in x.features:
                 value = await self.async_read_feature(x.features[y][0])
                 x.features[y][1] = value["items"][0]["payload"]["value"]
@@ -243,13 +243,10 @@ class LWLink2:
         return await self._async_sendmessage(readmess)
 
     def get_featureset_by_id(self, featureset_id):
-        for x in self.featuresets:
-            if x.featureset_id == featureset_id:
-                return x
-        return None
+        return self.featuresets[featureset_id]
 
     def get_featureset_by_featureid(self, feature_id):
-        for x in self.featuresets:
+        for dummy, x in self.featuresets.items():
             for y in x.features.values():
                 if y[0] == feature_id:
                     return x
@@ -277,21 +274,21 @@ class LWLink2:
 
     def get_switches(self):
         temp = []
-        for x in self.featuresets:
+        for dummy, x in self.featuresets.items():
             if x.is_switch():
                 temp.append((x.featureset_id, x.name))
         return temp
 
     def get_lights(self):
         temp = []
-        for x in self.featuresets:
+        for dummy, x in self.featuresets.items():
             if x.is_light():
                 temp.append((x.featureset_id, x.name))
         return temp
 
     def get_climates(self):
         temp = []
-        for x in self.featuresets:
+        for dummy, x in self.featuresets.items():
             if x.is_climate():
                 temp.append((x.featureset_id, x.name))
         return temp
@@ -316,7 +313,7 @@ class LWLink2:
 
     async def _authenticate(self):
         if not self._authtoken:
-            self._authtoken = self._get_access_token()
+            self._get_access_token()
         if self._authtoken:
             authmess = _LWRFMessage("user", "authenticate")
             authpayload = _LWRFMessageItem({"token": self._authtoken, "clientDeviceId": self._device_id})
@@ -347,10 +344,10 @@ class LWLink2:
         _LOGGER.debug("Received response: {}".format(req.json()))
         if req.status_code == 200:
             token = req.json()["tokens"]["access_token"]
+            self._authtoken = token
         else:
             _LOGGER.warning("No authentication token (status_code '{}').".format(req.status_code))
             raise ConnectionError("No authentication token: {}".format(req.text))
-        return token
 
     #########################################################
     # Convenience methods for non-async calls
@@ -387,7 +384,7 @@ class LWLink2Public(LWLink2):
 
     def __init__(self, api_token, refresh_token):
 
-        self.featuresets = []
+        self.featuresets = {}
         self._authtoken = None
 
         self._api_token = api_token
@@ -396,7 +393,7 @@ class LWLink2Public(LWLink2):
 
     async def async_get_hierarchy(self):
 
-        self.featuresets = []
+        self.featuresets = {}
         req = requests.get("https://publicapi.lightwaverf.com/v1/structures",
                            headers={"authorization": "bearer " + self._authtoken})
         for struct in req.json()["structures"]:
@@ -423,7 +420,7 @@ class LWLink2Public(LWLink2):
                             new_featureset._climate = True
                         if z["type"] == "identify":
                             new_featureset._gen2 = True
-                    self.featuresets.append(new_featureset)
+                    self.featuresets[y["featureSetId"]] = new_featureset
 
         await self.async_update_featureset_states()
 
@@ -433,7 +430,7 @@ class LWLink2Public(LWLink2):
 
     # TODO improve async_update_featureset_states - can use more feature batch read from public API
     async def async_update_featureset_states(self):
-        for x in self.featuresets:
+        for dummy, x in self.featuresets.items():
             for y in x.features:
                 value = await self.async_read_feature(x.features[y][0])
                 x.features[y][1] = value
