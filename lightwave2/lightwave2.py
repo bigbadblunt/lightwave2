@@ -175,6 +175,8 @@ class LWLink2:
         _LOGGER.debug("Reading groups {}".format(self._group_ids))
         await self._async_read_groups()
 
+        await self.async_update_featureset_states()
+
     async def _async_read_groups(self):
         self.featuresets = {}
         for groupId in self._group_ids:
@@ -213,7 +215,10 @@ class LWLink2:
                         y._gen2 = True
 
     async def async_update_featureset_states(self):
-        await self._async_read_groups()
+        for dummy, x in self.featuresets.items():
+            for y in x.features:
+                value = await self.async_read_feature(x.features[y][0])
+                x.features[y][1] = value["items"][0]["payload"]["value"]
 
     async def async_write_feature(self, feature_id, value):
         readmess = _LWRFMessage("feature", "write")
