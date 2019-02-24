@@ -72,13 +72,14 @@ class _LWRFFeatureSet:
 class LWLink2:
 
     def __init__(self, username, password):
+        self.featuresets = []
+        self._authtoken = None
+
         self._username = username
         self._password = password
         self._device_id = str(uuid.uuid4())
-        self._authtoken = None
         self._websocket = None
         self._callback = []
-        self.featuresets = []
 
         # Next three variables are used to synchronise responses to requests
         self._transaction = None
@@ -86,9 +87,6 @@ class LWLink2:
         self._response = None
 
         asyncio.ensure_future(self._consumer_handler())
-
-    def _sendmessage(self, message):
-        return asyncio.get_event_loop().run_until_complete(self._async_sendmessage(message))
 
     async def _async_sendmessage(self, message, _retry=1):
         # await self.outgoing.put(message)
@@ -164,9 +162,6 @@ class LWLink2:
         _LOGGER.debug("Register callback %s", callback)
         self._callback.append(callback)
 
-    def get_hierarchy(self):
-        return asyncio.get_event_loop().run_until_complete(self.async_get_hierarchy())
-
     async def async_get_hierarchy(self):
         _LOGGER.debug("Reading hierarchy")
         readmess = _LWRFMessage("user", "rootGroups")
@@ -229,26 +224,17 @@ class LWLink2:
                     if x["attributes"]["type"] == "identify":
                         y._gen2 = True
 
-    def update_featureset_states(self):
-        return asyncio.get_event_loop().run_until_complete(self.async_update_featureset_states())
-
     async def async_update_featureset_states(self):
         for x in self.featuresets:
             for y in x.features:
                 value = await self.async_read_feature(x.features[y][0])
                 x.features[y][1] = value["items"][0]["payload"]["value"]
 
-    def write_feature(self, feature_id, value):
-        return asyncio.get_event_loop().run_until_complete(self.async_write_feature(feature_id, value))
-
     async def async_write_feature(self, feature_id, value):
         readmess = _LWRFMessage("feature", "write")
         readitem = _LWRFMessageItem({"featureId": feature_id, "value": value})
         readmess.additem(readitem)
         await self._async_sendmessage(readmess)
-
-    def read_feature(self, feature_id):
-        return asyncio.get_event_loop().run_until_complete(self.async_read_feature(feature_id))
 
     async def async_read_feature(self, feature_id):
         readmess = _LWRFMessage("feature", "read")
@@ -269,32 +255,20 @@ class LWLink2:
                     return x
         return None
 
-    def turn_on_by_featureset_id(self, featureset_id):
-        return asyncio.get_event_loop().run_until_complete(self.async_turn_on_by_featureset_id(featureset_id))
-
     async def async_turn_on_by_featureset_id(self, featureset_id):
         y = self.get_featureset_by_id(featureset_id)
         feature_id = y.features["switch"][0]
         await self.async_write_feature(feature_id, 1)
-
-    def turn_off_by_featureset_id(self, featureset_id):
-        return asyncio.get_event_loop().run_until_complete(self.async_turn_off_by_featureset_id(featureset_id))
 
     async def async_turn_off_by_featureset_id(self, featureset_id):
         y = self.get_featureset_by_id(featureset_id)
         feature_id = y.features["switch"][0]
         await self.async_write_feature(feature_id, 0)
 
-    def set_brightness_by_featureset_id(self, featureset_id, level):
-        return asyncio.get_event_loop().run_until_complete(self.async_set_brightness_by_featureset_id(featureset_id, level))
-
     async def async_set_brightness_by_featureset_id(self, featureset_id, level):
         y = self.get_featureset_by_id(featureset_id)
         feature_id = y.features["dimLevel"][0]
         await self.async_write_feature(feature_id, level)
-
-    def set_temperature_by_featureset_id(self, featureset_id, level):
-        return asyncio.get_event_loop().run_until_complete(self.async_set_temperature_by_featureset_id(featureset_id, level))
 
     async def async_set_temperature_by_featureset_id(self, featureset_id, level):
         y = self.get_featureset_by_id(featureset_id)
@@ -370,7 +344,7 @@ class LWLink2:
         req = requests.post(AUTH_SERVER,
                             headers={"x-lwrf-appid": "ios-01"},
                             json=authentication)
-        _LOGGER.debug("Received response: {}".format(req))
+        _LOGGER.debug("Received response: {}".format(req.json()))
         if req.status_code == 200:
             token = req.json()["tokens"]["access_token"]
         else:
@@ -378,26 +352,56 @@ class LWLink2:
             raise ConnectionError("No authentication token: {}".format(req.text))
         return token
 
-class LWLink2Public:
+    #########################################################
+    # Convenience methods for non-async calls
+    #########################################################
 
-    def __init__(self, api_token, refresh_token):
-        self._api_token = api_token
-        self._refresh_token = refresh_token
-        self._access_token = None
-        self._token_expiry = None
-        self.featuresets = []
+    def _sendmessage(self, message):
+        return asyncio.get_event_loop().run_until_complete(self._async_sendmessage(message))
 
     def get_hierarchy(self):
         return asyncio.get_event_loop().run_until_complete(self.async_get_hierarchy())
+
+    def update_featureset_states(self):
+        return asyncio.get_event_loop().run_until_complete(self.async_update_featureset_states())
+
+    def write_feature(self, feature_id, value):
+        return asyncio.get_event_loop().run_until_complete(self.async_write_feature(feature_id, value))
+
+    def read_feature(self, feature_id):
+        return asyncio.get_event_loop().run_until_complete(self.async_read_feature(feature_id))
+
+    def turn_on_by_featureset_id(self, featureset_id):
+        return asyncio.get_event_loop().run_until_complete(self.async_turn_on_by_featureset_id(featureset_id))
+
+    def turn_off_by_featureset_id(self, featureset_id):
+        return asyncio.get_event_loop().run_until_complete(self.async_turn_off_by_featureset_id(featureset_id))
+
+    def set_brightness_by_featureset_id(self, featureset_id, level):
+        return asyncio.get_event_loop().run_until_complete(self.async_set_brightness_by_featureset_id(featureset_id, level))
+
+    def set_temperature_by_featureset_id(self, featureset_id, level):
+        return asyncio.get_event_loop().run_until_complete(self.async_set_temperature_by_featureset_id(featureset_id, level))
+
+class LWLink2Public(LWLink2):
+
+    def __init__(self, api_token, refresh_token):
+
+        self.featuresets = []
+        self._authtoken = None
+
+        self._api_token = api_token
+        self._refresh_token = refresh_token
+        self._token_expiry = None
 
     async def async_get_hierarchy(self):
 
         self.featuresets = []
         req = requests.get("https://publicapi.lightwaverf.com/v1/structures",
-                            headers={"authorization": "bearer " + self._access_token})
+                           headers={"authorization": "bearer " + self._authtoken})
         for struct in req.json()["structures"]:
             req = requests.get("https://publicapi.lightwaverf.com/v1/structure/" + struct,
-                               headers={"authorization": "bearer " + self._access_token})
+                               headers={"authorization": "bearer " + self._authtoken})
             response = req.json()
 
             for x in response["devices"]:
@@ -427,107 +431,30 @@ class LWLink2Public:
     async def async_register_callback(self, callback):
         pass
 
-    def update_featureset_states(self):
-        return asyncio.get_event_loop().run_until_complete(self.async_update_featureset_states())
-
+    # TODO improve async_update_featureset_states - can use more feature batch read from public API
     async def async_update_featureset_states(self):
         for x in self.featuresets:
             for y in x.features:
                 value = await self.async_read_feature(x.features[y][0])
                 x.features[y][1] = value
 
-    def write_feature(self, feature_id, value):
-        return asyncio.get_event_loop().run_until_complete(self.async_write_feature(feature_id, value))
-
     async def async_write_feature(self, feature_id, value):
         #TODO Check for expiry of auth token
         payload = {"value": value}
         req = requests.post("https://publicapi.lightwaverf.com/v1/feature/" + feature_id,
-                               headers={"authorization": "bearer " + self._access_token},
+                            headers={"authorization": "bearer " + self._authtoken},
                             json=payload)
         _LOGGER.debug("Received response: {}".format(req))
-
-    def read_feature(self, feature_id):
-        return asyncio.get_event_loop().run_until_complete(self.async_read_feature(feature_id))
 
     async def async_read_feature(self, feature_id):
         # TODO Check for expiry of auth token
         req = requests.get("https://publicapi.lightwaverf.com/v1/feature/" + feature_id,
-                               headers={"authorization": "bearer " + self._access_token})
+                           headers={"authorization": "bearer " + self._authtoken})
         return req.json()["value"]
-
-    def get_featureset_by_id(self, featureset_id):
-        for x in self.featuresets:
-            if x.featureset_id == featureset_id:
-                return x
-        return None
-
-    def get_featureset_by_featureid(self, feat_id):
-        for x in self.featuresets:
-            for y in x.features.values():
-                if y[0] == feat_id:
-                    return x
-        return None
-
-    def turn_on_by_featureset_id(self, featureset_id):
-        return asyncio.get_event_loop().run_until_complete(self.async_turn_on_by_featureset_id(featureset_id))
-
-    async def async_turn_on_by_featureset_id(self, featureset_id):
-        y = self.get_featureset_by_id(featureset_id)
-        feature_id = y.features["switch"][0]
-        await self.async_write_feature(feature_id, 1)
-
-    def turn_off_by_featureset_id(self, featureset_id):
-        return asyncio.get_event_loop().run_until_complete(self.async_turn_off_by_featureset_id(featureset_id))
-
-    async def async_turn_off_by_featureset_id(self, featureset_id):
-        y = self.get_featureset_by_id(featureset_id)
-        feature_id = y.features["switch"][0]
-        await self.async_write_feature(feature_id, 0)
-
-    def set_brightness_by_featureset_id(self, featureset_id, level):
-        return asyncio.get_event_loop().run_until_complete(self.async_set_brightness_by_featureset_id(featureset_id, level))
-
-    async def async_set_brightness_by_featureset_id(self, featureset_id, level):
-        y = self.get_featureset_by_id(featureset_id)
-        feature_id = y.features["dimLevel"][0]
-        await self.async_write_feature(feature_id, level)
-
-    def set_temperature_by_featureset_id(self, featureset_id, level):
-        return asyncio.get_event_loop().run_until_complete(self.async_set_temperature_by_featureset_id(featureset_id, level))
-
-    async def async_set_temperature_by_featureset_id(self, featureset_id, level):
-        y = self.get_featureset_by_id(featureset_id)
-        feature_id = y.features["targetTemperature"][0]
-        await self.async_write_feature(feature_id, int(level * 10))
-
-    def get_switches(self):
-        temp = []
-        for x in self.featuresets:
-            if x.is_switch():
-                temp.append((x.featureset_id, x.name))
-        return temp
-
-    def get_lights(self):
-        temp = []
-        for x in self.featuresets:
-            if x.is_light():
-                temp.append((x.featureset_id, x.name))
-        return temp
-
-    def get_climates(self):
-        temp = []
-        for x in self.featuresets:
-            if x.is_climate():
-                temp.append((x.featureset_id, x.name))
-        return temp
 
     #########################################################
     # Connection
     #########################################################
-
-    def connect(self):
-        return asyncio.get_event_loop().run_until_complete(self.async_connect())
 
     async def async_connect(self, tries=0):
         try:
@@ -547,7 +474,7 @@ class LWLink2Public:
                             json=authentication)
         _LOGGER.debug("Received response: {}".format(req))
         if req.status_code == 200:
-            self._access_token = req.json()["access_token"]
+            self._authtoken = req.json()["access_token"]
             self._refresh_token = req.json()["refresh_token"]
             self._token_expiry = datetime.datetime.now() + datetime.timedelta(seconds=req.json()["expires_in"])
         else:
