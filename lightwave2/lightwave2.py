@@ -4,9 +4,11 @@ import websockets
 import uuid
 import json
 import datetime
+import aiohttp
 
 import logging
 
+#TODO move to aiohttp for websockets
 _LOGGER = logging.getLogger(__name__)
 
 AUTH_SERVER = "https://auth.lightwaverf.com/v2/lightwaverf/autouserlogin/lwapps"
@@ -70,12 +72,17 @@ class _LWRFFeatureSet:
 
 class LWLink2:
 
-    def __init__(self, username, password):
+    def __init__(self, username=None, password=None):
+
         self.featuresets = {}
         self._authtoken = None
 
         self._username = username
         self._password = password
+
+        self._session = aiohttp.ClientSession()
+
+        #Websocket only variables:
         self._device_id = str(uuid.uuid4())
         self._websocket = None
         self._callback = []
@@ -287,9 +294,6 @@ class LWLink2:
     # Connection
     #########################################################
 
-    def connect(self):
-        return asyncio.get_event_loop().run_until_complete(self.async_connect())
-
     async def async_connect(self, tries=0):
         try:
             if not self._websocket or not self._websocket.open:
@@ -303,7 +307,7 @@ class LWLink2:
 
     async def _authenticate(self):
         if not self._authtoken:
-            self._get_access_token()
+            await self._get_access_token()
         if self._authtoken:
             authmess = _LWRFMessage("user", "authenticate")
             authpayload = _LWRFMessageItem({"token": self._authtoken, "clientDeviceId": self._device_id})
@@ -325,19 +329,16 @@ class LWLink2:
         else:
             return None
 
-    def _get_access_token(self):
-        _LOGGER.debug("Requesting authentication token")
+    async def _get_access_token(self):
+        _LOGGER.debug("Requesting authentication token (using username and password)")
         authentication = {"email": self._username, "password": self._password, "version": VERSION}
-        req = requests.post(AUTH_SERVER,
-                            headers={"x-lwrf-appid": "ios-01"},
-                            json=authentication)
-        _LOGGER.debug("Received response: {}".format(req.json()))
-        if req.status_code == 200:
-            token = req.json()["tokens"]["access_token"]
-            self._authtoken = token
-        else:
-            _LOGGER.warning("No authentication token (status_code '{}').".format(req.status_code))
-            raise ConnectionError("No authentication token: {}".format(req.text))
+        async with self._session.post(AUTH_SERVER, headers={"x-lwrf-appid": "ios-01"}, json=authentication) as req:
+            _LOGGER.debug("Received response: {}".format(await req.json()))
+            if req.status == 200:
+                self._authtoken = (await req.json())["tokens"]["access_token"]
+            else:
+                _LOGGER.warning("No authentication token (status_code '{}').".format(req.status))
+                raise ConnectionError("No authentication token: {}".format(await req.text))
 
     #########################################################
     # Convenience methods for non-async calls
@@ -370,27 +371,35 @@ class LWLink2:
     def set_temperature_by_featureset_id(self, featureset_id, level):
         return asyncio.get_event_loop().run_until_complete(self.async_set_temperature_by_featureset_id(featureset_id, level))
 
+    def connect(self):
+        return asyncio.get_event_loop().run_until_complete(self.async_connect())
+
 class LWLink2Public(LWLink2):
 
-    def __init__(self, api_token, refresh_token):
+    def __init__(self, username=None, password=None, auth_method="username", api_token=None, refresh_token=None):
 
         self.featuresets = {}
         self._authtoken = None
 
+        self._username = username
+        self._password = password
+        self._auth_method = auth_method
         self._api_token = api_token
         self._refresh_token = refresh_token
+
+        self._session = aiohttp.ClientSession()
         self._token_expiry = None
 
-    #TODO add retries
+    #TODO add retries/error checking
     #TODO make this async!
-    async def _async_getrequest(self, endpoint,  _retry=1):
+    async def _async_getrequest(self, endpoint, _retry=1):
         _LOGGER.debug("Sending API GET request to {}".format(endpoint))
         req = requests.get(PUBLIC_API + endpoint,
                            headers={"authorization": "bearer " + self._authtoken})
         _LOGGER.debug("Received API response {}".format(req.json()))
         return req.json()
 
-    async def _async_postrequest(self, endpoint, body,  _retry=1):
+    async def _async_postrequest(self, endpoint, body="", _retry=1):
         _LOGGER.debug("Sending API POST request to {}: {}".format(endpoint, body))
         req = requests.post(PUBLIC_API + endpoint,
                             headers={"authorization": "bearer " + self._authtoken}, json=body)
@@ -438,29 +447,20 @@ class LWLink2Public(LWLink2):
             for y in x.features:
                 feature_list.append({"featureId":x.features[y][0]})
         body = {"features":feature_list}
-        _LOGGER.debug("Sending API request: {}".format(body))
-        req = requests.post("https://publicapi.lightwaverf.com/v1/features/read",
-                            headers={"authorization": "bearer " + self._authtoken}, json=body)
-        _LOGGER.debug("Received API response {}".format(req.json()))
+        req = await self._async_postrequest("features/read", body)
 
         for featuresetid in self.featuresets:
             for featurename in self.featuresets[featuresetid].features:
-                if self.featuresets[featuresetid].features[featurename][0] in req.json():
-                    self.featuresets[featuresetid].features[featurename][1] = req.json()[self.featuresets[featuresetid].features[featurename][0]]
+                if self.featuresets[featuresetid].features[featurename][0] in req:
+                    self.featuresets[featuresetid].features[featurename][1] = req[self.featuresets[featuresetid].features[featurename][0]]
 
     async def async_write_feature(self, feature_id, value):
-        #TODO Check for expiry of auth token
         payload = {"value": value}
-        req = requests.post("https://publicapi.lightwaverf.com/v1/feature/" + feature_id,
-                            headers={"authorization": "bearer " + self._authtoken},
-                            json=payload)
-        _LOGGER.debug("Received response: {}".format(req))
+        await self._async_postrequest("feature/" + feature_id, payload)
 
     async def async_read_feature(self, feature_id):
-        # TODO Check for expiry of auth token
-        req = requests.get("https://publicapi.lightwaverf.com/v1/feature/" + feature_id,
-                           headers={"authorization": "bearer " + self._authtoken})
-        return req.json()["value"]
+        req = await self._async_getrequest("feature/" + feature_id)
+        return req["value"]
 
     #########################################################
     # Connection
@@ -468,7 +468,7 @@ class LWLink2Public(LWLink2):
 
     async def async_connect(self, tries=0):
         try:
-            return await self._get_access_token()
+            self._get_access_token()
         except Exception as exp:
             retry_delay = min(2 ** (tries + 1), 120)
             _LOGGER.warning("Cannot connect (exception '{}'). Waiting {} seconds".format(exp, retry_delay))
@@ -476,9 +476,31 @@ class LWLink2Public(LWLink2):
             return await self.async_connect(tries + 1)
     #TODO distinguish failure on no token and don't retry
 
-    #TODO allow password auth or refresh token auth on both public and private
-    async def _get_access_token(self):
-        _LOGGER.debug("Requesting authentication token")
+    def _get_access_token(self):
+        if self._auth_method == "username":
+            self._get_access_token_username()
+        elif self._auth_method == "api":
+            self._get_access_token_api()
+        else:
+            raise ValueError("auth_method must be 'username' or 'api'")
+
+    def _get_access_token_username(self):
+        _LOGGER.debug("Requesting authentication token (using username and password)")
+        authentication = {"email": self._username, "password": self._password, "version": VERSION}
+        req = requests.post(AUTH_SERVER,
+                            headers={"x-lwrf-appid": "ios-01"},
+                            json=authentication)
+        _LOGGER.debug("Received response: {}".format(req.json()))
+        if req.status_code == 200:
+            token = req.json()["tokens"]["access_token"]
+            self._authtoken = token
+        else:
+            _LOGGER.warning("No authentication token (status_code '{}').".format(req.status_code))
+            raise ConnectionError("No authentication token: {}".format(req.text))
+
+    #TODO check for token expiry
+    def _get_access_token_api(self):
+        _LOGGER.debug("Requesting authentication token (using API key and refresh token)")
         authentication = {"grant_type": "refresh_token", "refresh_token": self._refresh_token}
         req = requests.post(PUBLIC_AUTH_SERVER,
                             headers={"authorization": "basic " + self._api_token},
