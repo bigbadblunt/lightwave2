@@ -1,6 +1,5 @@
 import requests
 import asyncio
-import websockets
 import uuid
 import json
 import datetime
@@ -8,7 +7,6 @@ import aiohttp
 
 import logging
 
-#TODO move to aiohttp for websockets
 _LOGGER = logging.getLogger(__name__)
 
 AUTH_SERVER = "https://auth.lightwaverf.com/v2/lightwaverf/autouserlogin/lwapps"
@@ -103,7 +101,7 @@ class LWLink2:
             _LOGGER.debug("Connection reopened")
 
         _LOGGER.debug("Sending: %s", message.json())
-        await self._websocket.send(message.json())
+        await self._websocket.send_str(message.json())
         self._transaction = message._message["transactionId"]
         self._waitingforresponse.clear()
         await self._waitingforresponse.wait()
@@ -125,8 +123,7 @@ class LWLink2:
     def _consumer_handler(self):
         while True:
             try:
-                jsonmessage = yield from self._websocket.recv()
-                message = json.loads(jsonmessage)
+                message = (yield from self._websocket.receive()).json()
                 _LOGGER.debug("Received %s", message)
                 # Some transaction IDs don't work, this is a workaround
                 if message["class"] == "feature" and (
@@ -155,14 +152,14 @@ class LWLink2:
                     _LOGGER.warning("Received unhandled message: %s", message)
             except AttributeError:  # websocket is None if not set up, just wait for a while
                 yield from asyncio.sleep(1)
-            except websockets.ConnectionClosed:
-                # We're not going to get a response, so clear response flag to allow _send_message to unblock
-                _LOGGER.debug("Websocket closed in message handler")
-                self._waitingforresponse.set()
-                self._transactions = None
-                self._response = None
-                self._websocket = None
-                yield from asyncio.sleep(1)
+            #except websockets.ConnectionClosed:
+            #    # We're not going to get a response, so clear response flag to allow _send_message to unblock
+            #    _LOGGER.debug("Websocket closed in message handler")
+            #    self._waitingforresponse.set()
+            #    self._transactions = None
+            #    self._response = None
+            #    self._websocket = None
+            #    yield from asyncio.sleep(1)
 
     async def async_register_callback(self, callback):
         _LOGGER.debug("Register callback %s", callback)
@@ -296,8 +293,8 @@ class LWLink2:
 
     async def async_connect(self, tries=0):
         try:
-            if not self._websocket or not self._websocket.open:
-                self._websocket = await websockets.connect(TRANS_SERVER, ssl=True)
+            if not self._websocket or self._websocket.closed:
+                self._websocket = await self._session.ws_connect(TRANS_SERVER)
             return await self._authenticate()
         except Exception as exp:
             retry_delay = min(2 ** (tries + 1), 120)
