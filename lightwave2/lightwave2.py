@@ -95,7 +95,7 @@ class LWLink2:
 
     async def _async_sendmessage(self, message, _retry=1):
 
-        if not self._websocket:
+        if not self._websocket or self._websocket.closed:
             _LOGGER.debug("Can't send (websocket closed), reconnecting")
             await self.async_connect()
             _LOGGER.debug("Connection reopened")
