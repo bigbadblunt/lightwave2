@@ -123,8 +123,9 @@ class LWLink2:
     def _consumer_handler(self):
         while True:
             try:
-                message = (yield from self._websocket.receive()).json()
-                _LOGGER.debug("Received %s", message)
+                mess = yield from self._websocket.receive()
+                _LOGGER.debug("Received %s", mess)
+                message = mess.json()
                 # Some transaction IDs don't work, this is a workaround
                 if message["class"] == "feature" and (
                         message["operation"] == "write" or message["operation"] == "read"):
