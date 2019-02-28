@@ -159,7 +159,7 @@ class LWLink2:
                     self._transactions = None
                     self._response = None
                     self._websocket = None
-                    yield from self.async_connect()
+                    asyncio.ensure_future(self.async_connect())
             except AttributeError:  # websocket is None if not set up, just wait for a while
                 yield from asyncio.sleep(1)
 
