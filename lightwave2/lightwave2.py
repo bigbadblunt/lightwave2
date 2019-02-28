@@ -125,42 +125,44 @@ class LWLink2:
             try:
                 mess = yield from self._websocket.receive()
                 _LOGGER.debug("Received %s", mess)
-                message = mess.json()
-                # Some transaction IDs don't work, this is a workaround
-                if message["class"] == "feature" and (
-                        message["operation"] == "write" or message["operation"] == "read"):
-                    message["transactionId"] = message["items"][0]["itemId"]
-                # now parse the message
-                if message["transactionId"] == self._transaction:
+                if mess.type == aiohttp.WSMsgType.TEXT:
+                    message = mess.json()
+                    # Some transaction IDs don't work, this is a workaround
+                    if message["class"] == "feature" and (
+                            message["operation"] == "write" or message["operation"] == "read"):
+                        message["transactionId"] = message["items"][0]["itemId"]
+                    # now parse the message
+                    if message["transactionId"] == self._transaction:
+                        self._waitingforresponse.set()
+                        self._transactions = None
+                        self._response = message
+                    elif message["direction"] == "notification" and message["class"] == "group" \
+                            and message["operation"] == "event":
+                        yield from self.async_get_hierarchy()
+                    elif message["direction"] == "notification" and message["operation"] == "event":
+                        if "_feature" in message["items"][0]["payload"]:
+                            feature_id = message["items"][0]["payload"]["_feature"]["featureId"]
+                            feature = message["items"][0]["payload"]["_feature"]["featureType"]
+                            value = message["items"][0]["payload"]["value"]
+                            self.get_featureset_by_featureid(feature_id).features[feature][1] = value
+                            _LOGGER.debug("Calling callbacks %s", self._callback)
+                            for func in self._callback:
+                                func()
+                        else:
+                            _LOGGER.warning("Message with no _feature: %s", message)
+                    else:
+                        _LOGGER.warning("Received unhandled message: %s", message)
+                elif mess.type == aiohttp.WSMsgType.CLOSED:
+                # We're not going to get a response, so clear response flag to allow _send_message to unblock
+                    _LOGGER.debug("Websocket closed in message handler")
                     self._waitingforresponse.set()
                     self._transactions = None
-                    self._response = message
-                elif message["direction"] == "notification" and message["class"] == "group" \
-                        and message["operation"] == "event":
-                    yield from self.async_get_hierarchy()
-                elif message["direction"] == "notification" and message["operation"] == "event":
-                    if "_feature" in message["items"][0]["payload"]:
-                        feature_id = message["items"][0]["payload"]["_feature"]["featureId"]
-                        feature = message["items"][0]["payload"]["_feature"]["featureType"]
-                        value = message["items"][0]["payload"]["value"]
-                        self.get_featureset_by_featureid(feature_id).features[feature][1] = value
-                        _LOGGER.debug("Calling callbacks %s", self._callback)
-                        for func in self._callback:
-                            func()
-                    else:
-                        _LOGGER.warning("Message with no _feature: %s", message)
-                else:
-                    _LOGGER.warning("Received unhandled message: %s", message)
+                    self._response = None
+                    self._websocket = None
+                    yield from self.async_connect()
             except AttributeError:  # websocket is None if not set up, just wait for a while
                 yield from asyncio.sleep(1)
-            #except websockets.ConnectionClosed:
-            #    # We're not going to get a response, so clear response flag to allow _send_message to unblock
-            #    _LOGGER.debug("Websocket closed in message handler")
-            #    self._waitingforresponse.set()
-            #    self._transactions = None
-            #    self._response = None
-            #    self._websocket = None
-            #    yield from asyncio.sleep(1)
+
 
     async def async_register_callback(self, callback):
         _LOGGER.debug("Register callback %s", callback)
