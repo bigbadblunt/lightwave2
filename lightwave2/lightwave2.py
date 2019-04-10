@@ -140,16 +140,25 @@ class LWLink2:
                             and message["operation"] == "event":
                         yield from self.async_get_hierarchy()
                     elif message["direction"] == "notification" and message["operation"] == "event":
+                        #TODO: First call is unecessary, see if second works then refactor the first one out
                         if "_feature" in message["items"][0]["payload"]:
                             feature_id = message["items"][0]["payload"]["_feature"]["featureId"]
                             feature = message["items"][0]["payload"]["_feature"]["featureType"]
                             value = message["items"][0]["payload"]["value"]
                             self.get_featureset_by_featureid(feature_id).features[feature][1] = value
-                            _LOGGER.debug("Calling callbacks %s", self._callback)
+                            _LOGGER.debug("Event with _feature received, calling callbacks %s", self._callback)
+                            for func in self._callback:
+                                func()
+                        elif "featureId" in message["items"][0]["payload"]:
+                            feature_id = message["items"][0]["payload"]["featureId"]
+                            feature = self.get_feature_by_featureid(feature_id)
+                            value = message["items"][0]["payload"]["value"]
+                            self.get_featureset_by_featureid(feature_id).features[feature][1] = value
+                            _LOGGER.debug("Event without _feature received, calling callbacks %s", self._callback)
                             for func in self._callback:
                                 func()
                         else:
-                            _LOGGER.warning("Message with no _feature: %s", message)
+                            _LOGGER.warning("Unhandled event message: %s", message)
                     else:
                         _LOGGER.warning("Received unhandled message: %s", message)
                 elif mess.type == aiohttp.WSMsgType.CLOSED:
@@ -248,6 +257,12 @@ class LWLink2:
                 if y[0] == feature_id:
                     return x
         return None
+
+    def get_feature_by_featureid(self, feature_id):
+        for dummy, x in self.featuresets.items():
+            for z, y in x.features.items():
+                if y[0] == feature_id:
+                    return z
 
     async def async_turn_on_by_featureset_id(self, featureset_id):
         y = self.get_featureset_by_id(featureset_id)
