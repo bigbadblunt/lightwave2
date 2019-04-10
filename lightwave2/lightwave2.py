@@ -140,21 +140,12 @@ class LWLink2:
                             and message["operation"] == "event":
                         yield from self.async_get_hierarchy()
                     elif message["direction"] == "notification" and message["operation"] == "event":
-                        #TODO: First call is unecessary, see if second works then refactor the first one out
-                        if "_feature" in message["items"][0]["payload"]:
-                            feature_id = message["items"][0]["payload"]["_feature"]["featureId"]
-                            feature = message["items"][0]["payload"]["_feature"]["featureType"]
-                            value = message["items"][0]["payload"]["value"]
-                            self.get_featureset_by_featureid(feature_id).features[feature][1] = value
-                            _LOGGER.debug("Event with _feature received (%s %s %s), calling callbacks %s", feature_id, feature, value, self._callback)
-                            for func in self._callback:
-                                func()
-                        elif "featureId" in message["items"][0]["payload"]:
+                        if "featureId" in message["items"][0]["payload"]:
                             feature_id = message["items"][0]["payload"]["featureId"]
                             feature = self.get_feature_by_featureid(feature_id)
                             value = message["items"][0]["payload"]["value"]
                             self.get_featureset_by_featureid(feature_id).features[feature][1] = value
-                            _LOGGER.debug("Event without _feature received (%s %s %s), calling callbacks %s", feature_id, feature, value, self._callback)
+                            _LOGGER.debug("Event received (%s %s %s), calling callbacks %s", feature_id, feature, value, self._callback)
                             for func in self._callback:
                                 func()
                         else:
