@@ -154,7 +154,7 @@ class LWLink2:
                             feature = self.get_feature_by_featureid(feature_id)
                             value = message["items"][0]["payload"]["value"]
                             self.get_featureset_by_featureid(feature_id).features[feature][1] = value
-                            _LOGGER.debug("Event with _feature received (%s %s %s), calling callbacks %s", feature_id, feature, value, self._callback)
+                            _LOGGER.debug("Event without _feature received (%s %s %s), calling callbacks %s", feature_id, feature, value, self._callback)
                             for func in self._callback:
                                 func()
                         else:
