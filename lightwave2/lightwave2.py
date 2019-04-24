@@ -329,8 +329,12 @@ class LWLink2:
                     _LOGGER.debug("Authentication token rejected, regenerating and reauthenticating")
                     self._authtoken = None
                     await self._authenticate()
+                elif response["items"][0]["error"]["message"] == "user-msgs: Token not valid/expired.":
+                    _LOGGER.debug("Authentication token expired, regenerating and reauthenticating")
+                    self._authtoken = None
+                    await self._authenticate()
                 else:
-                    _LOGGER.debug("Unhandled authentication error {}".format(response["items"][0]["error"]["message"]))
+                    _LOGGER.warning("Unhandled authentication error {}".format(response["items"][0]["error"]["message"]))
             return response
         else:
             return None
