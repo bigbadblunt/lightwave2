@@ -109,7 +109,7 @@ Finally there are a handful of convenience methods if you just want to return de
     print(link.get_climates())
 
 #### Writing to a feature
-Turning on, off or setting the brightness level for a light is as follows:
+Turning on a switch/light, turning off a switch/light or setting the brightness level for a light is as follows:
 
     link.turn_on_by_featureset_id("5bc4d06e87779374d29d7d9a-5bc4d61387779374d29fdd1e") 
     link.turn_off_by_featureset_id("5bc4d06e87779374d29d7d9a-5bc4d61387779374d29fdd1e") 
