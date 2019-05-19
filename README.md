@@ -49,7 +49,7 @@ For a slightly more useful view:
 
 In my case this returns
 
-    Garden Room 5bc4d06e87779374d29d7d9a-5bc4d61387779374d29fdd1e {'switch': ['5bc4d06e87779374d29d7d9a-28-3157334318+1', 0], 'protection': ['5bc4d06e87779374d29d7d9a-29-3157334318+1', 0], 'dimLevel': ['5bc4d06e87779374d29d7d9a-30-3157334318+1', 0]}
+    Garden Room 5bc4d06e87779374d29d7d9a-5bc4d61387779374d29fdd1e {'switch': ['5bc4d06e87779374d29d7d9a-28-3157334318+1', 1], 'protection': ['5bc4d06e87779374d29d7d9a-29-3157334318+1', 0], 'dimLevel': ['5bc4d06e87779374d29d7d9a-30-3157334318+1', 40]}
 
 This is a light switch with the name `Garden Room` and the featureset id `5bc4d06e87779374d29d7d9a-5bc4d61387779374d29fdd1e` which we'll use in the example.
 
