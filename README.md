@@ -1,7 +1,14 @@
 Python library to provide a reliable communication link with LightWaveRF second generation lights and switches.
 
+## Installing
 
+The easiest way is 
 
+    pip3 install lightwave2
+
+Or just copy https://raw.githubusercontent.com/bigbadblunt/lightwave2/master/lightwave2/lightwave2.py into your project
+
+## Using the library
 
 #### Imports
 You'll need to import the library
