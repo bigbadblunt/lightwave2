@@ -3,7 +3,7 @@ Python library to provide a reliable communication link with LightWaveRF second 
 
 
 
-##Imports
+#### Imports
 You'll need to import the library
 
     from lightwave2 import lightwave2
@@ -13,7 +13,7 @@ If you want to see all the messages passed back and forth with the Lightwave ser
     import logging
     logging.basicConfig(level=logging.DEBUG)
     
-##Connecting
+#### Connecting
 Start by authenticating with the LW servers.
 
     link = lightwave2.LWLink2("example@example.com", "password")
@@ -22,7 +22,7 @@ This sets up a `LWLink2` object called `link`, and gets an authentication token 
         
     link.connect()
 
-##Read hierarchy
+#### Read hierarchy
 Next:
 
     link.get_hierarchy()
@@ -46,16 +46,16 @@ In my case this returns
 
 This is a light switch with the name `Garden Room` and the featureset id `5bc4d06e87779374d29d7d9a-5bc4d61387779374d29fdd1e` which we'll use in the example.
 
-##Reading the featuresets
+#### Reading the featuresets
 
 The easiest way if you know the featureset id is just to use the item from the dictionary directly:
 
-###Name
+###### Name
     print(link.featuresets['5bc4d06e87779374d29d7d9a-5bc4d61387779374d29fdd1e'].name)
     
 will give the name you assigned when you set up the device in the LW app. 
 
-###Type of device    
+###### Type of device    
 
 Is this featureset a (non-light) switch:
     
@@ -73,7 +73,7 @@ Is it a generation 2 ("Smart series") device:
     
     print(link.featuresets['5bc4d06e87779374d29d7d9a-5bc4d61387779374d29fdd1e'].is_gen2())
 
-###Device features
+###### Device features
 
 This is how we find out the state of the device, and we will also use this information to control the device:
 
@@ -89,7 +89,7 @@ E.g. for me, the above returns
 
 showing the light is currently on (feature `switch`), the physical buttons are not locked (feature `protection`) and the brightness is set to 40% (feature `dimlevel`).
 
-##More reading the featuresets
+#### More reading the featuresets
 
 The values of the featuresets are static and won't respond to changes in the state of the physical device (unless you set up a callback to handle messages from the server). If you want to make sure the values are up to date you can: 
 
@@ -101,7 +101,7 @@ Finally there are a handful of convenience methods if you just want to return de
     print(link.get_lights())
     print(link.get_climates())
 
-##Writing to a feature
+#### Writing to a feature
 Turning on, off or setting the brightness level for a light is as follows:
 
     link.turn_on_by_featureset_id("5bc4d06e87779374d29d7d9a-5bc4d61387779374d29fdd1e") 
@@ -117,7 +117,7 @@ Finally, for any other features you might want to read or write the value of, yo
     link.read_feature(feature_id)
     link.write_feature(feature_id, value)
     
-##Getting notified when something changes
+#### Getting notified when something changes
 
 This library is all using async programming, so notifications will only really work if your code is also async and is managing the event loop. Nonetheless, you can try the following for an idea of how to get a callback when an event is spotted by the server:
 
@@ -130,7 +130,7 @@ This library is all using async programming, so notifications will only really w
     
 This will call the `test` function every time a change is detected to the state of one of the features. This is likely only useful if you then run `link.update_featureset_states()` to ensure the internal state of the object is consistent with your actual LW system.
 
-##async methods
+#### async methods
 
 As mentioned above, the library provdes async versions of all methods (in fact the sync versions described above are just wrappers for the async versions)
 
