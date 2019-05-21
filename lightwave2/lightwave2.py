@@ -68,6 +68,9 @@ class _LWRFFeatureSet:
     def is_gen2(self):
         return self._gen2
 
+    def reports_power(self):
+        return self._power_reporting
+
 class LWLink2:
 
     def __init__(self, username=None, password=None):
@@ -220,6 +223,8 @@ class LWLink2:
                         y._climate = True
                     if x["attributes"]["type"] == "identify":
                         y._gen2 = True
+                    if x["attributes"]["type"] == "switch":
+                        y._power_reporting = True
 
     async def async_update_featureset_states(self):
         for dummy, x in self.featuresets.items():
