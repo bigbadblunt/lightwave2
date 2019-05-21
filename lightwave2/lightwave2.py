@@ -55,6 +55,7 @@ class _LWRFFeatureSet:
         self._dimmable = False
         self._climate = False
         self._gen2 = False
+        self._power_reporting = False
 
     def is_switch(self):
         return self._switchable and not self._dimmable
@@ -223,7 +224,7 @@ class LWLink2:
                         y._climate = True
                     if x["attributes"]["type"] == "identify":
                         y._gen2 = True
-                    if x["attributes"]["type"] == "switch":
+                    if x["attributes"]["type"] == "power":
                         y._power_reporting = True
 
     async def async_update_featureset_states(self):
