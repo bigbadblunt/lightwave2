@@ -499,7 +499,7 @@ class LWLink2Public(LWLink2):
         payload = {"events": [{"type": "feature", "id": feature_id}],
                     "url": url,
                     "ref": ref}
-        req = await. self._async_postrequest("events", payload)
+        req = await self._async_postrequest("events", payload)
         #TODO: test for req = 200
 
     async def async_update_featureset_states(self):
