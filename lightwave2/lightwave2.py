@@ -81,7 +81,7 @@ class _LWRFFeatureSet:
 
 class LWLink2:
 
-    def __init__(self, username=None, password=None):
+    def __init__(self, username=None, password=None, auth_method="username", api_token=None, refresh_token=None):
 
         self.featuresets = {}
         self._authtoken = None
@@ -89,7 +89,12 @@ class LWLink2:
         self._username = username
         self._password = password
 
+        self._auth_method = auth_method
+        self._api_token = api_token
+        self._refresh_token = refresh_token
+
         self._session = aiohttp.ClientSession()
+        self._token_expiry = None
 
         # Websocket only variables:
         self._device_id = str(uuid.uuid4())
@@ -340,14 +345,14 @@ class LWLink2:
         try:
             if not self._websocket or self._websocket.closed:
                 self._websocket = await self._session.ws_connect(TRANS_SERVER)
-            return await self._authenticate()
+            return await self._authenticate_websocket()
         except Exception as exp:
             retry_delay = min(2 ** (tries + 1), 120)
             _LOGGER.warning("Cannot connect (exception '{}'). Waiting {} seconds".format(exp, retry_delay))
             await asyncio.sleep(retry_delay)
             return await self.async_connect(tries + 1)
 
-    async def _authenticate(self):
+    async def _authenticate_websocket(self):
         if not self._authtoken:
             await self._get_access_token()
         if self._authtoken:
@@ -364,11 +369,11 @@ class LWLink2:
                     # Lightwave seems to return a string for 200 but an int for 405!
                     _LOGGER.debug("Authentication token rejected, regenerating and reauthenticating")
                     self._authtoken = None
-                    await self._authenticate()
+                    await self._authenticate_websocket()
                 elif response["items"][0]["error"]["message"] == "user-msgs: Token not valid/expired.":
                     _LOGGER.debug("Authentication token expired, regenerating and reauthenticating")
                     self._authtoken = None
-                    await self._authenticate()
+                    await self._authenticate_websocket()
                 else:
                     _LOGGER.warning("Unhandled authentication error {}".format(response["items"][0]["error"]["message"]))
             return response
@@ -376,6 +381,14 @@ class LWLink2:
             return None
 
     async def _get_access_token(self):
+        if self._auth_method == "username":
+            await self._get_access_token_username()
+        elif self._auth_method == "api":
+            self._get_access_token_api()
+        else:
+            raise ValueError("auth_method must be 'username' or 'api'")
+
+    async def _get_access_token_username(self):
         _LOGGER.debug("Requesting authentication token (using username and password)")
         authentication = {"email": self._username, "password": self._password, "version": VERSION}
         async with self._session.post(AUTH_SERVER, headers={"x-lwrf-appid": "ios-01"}, json=authentication) as req:
@@ -385,6 +398,22 @@ class LWLink2:
             else:
                 _LOGGER.warning("No authentication token (status_code '{}').".format(req.status))
                 raise ConnectionError("No authentication token: {}".format(await req.text))
+
+    # TODO check for token expiry
+    def _get_access_token_api(self):
+        _LOGGER.debug("Requesting authentication token (using API key and refresh token)")
+        authentication = {"grant_type": "refresh_token", "refresh_token": self._refresh_token}
+        req = requests.post(PUBLIC_AUTH_SERVER,
+                            headers={"authorization": "basic " + self._api_token},
+                            json=authentication)
+        _LOGGER.debug("Received response: {}".format(req))
+        if req.status_code == 200:
+            self._authtoken = req.json()["access_token"]
+            self._refresh_token = req.json()["refresh_token"]
+            self._token_expiry = datetime.datetime.now() + datetime.timedelta(seconds=req.json()["expires_in"])
+        else:
+            _LOGGER.warning("No authentication token (status_code '{}').".format(req.status_code))
+            raise ConnectionError("No authentication token: {}".format(req.text))
 
     #########################################################
     # Convenience methods for non-async calls
@@ -447,7 +476,6 @@ class LWLink2Public(LWLink2):
         self._token_expiry = None
 
     # TODO add retries/error checking
-    # TODO make this async!
     async def _async_getrequest(self, endpoint, _retry=1):
         _LOGGER.debug("Sending API GET request to {}".format(endpoint))
         req = requests.get(PUBLIC_API + endpoint,
@@ -495,6 +523,10 @@ class LWLink2Public(LWLink2):
                             new_featureset._climate = True
                         if z["type"] == "identify":
                             new_featureset._gen2 = True
+                        if z["type"] == "power":
+                            new_featureset._power_reporting = True
+                        if z["type"] == "threeWayRelay":
+                            new_featureset._cover = True
                     self.featuresets[y["featureSetId"]] = new_featureset
 
         await self.async_update_featureset_states()
@@ -539,7 +571,7 @@ class LWLink2Public(LWLink2):
 
     async def async_connect(self, tries=0):
         try:
-            self._get_access_token()
+            await self._get_access_token()
         except Exception as exp:
             retry_delay = min(2 ** (tries + 1), 120)
             _LOGGER.warning("Cannot connect (exception '{}'). Waiting {} seconds".format(exp, retry_delay))
@@ -547,40 +579,4 @@ class LWLink2Public(LWLink2):
             return await self.async_connect(tries + 1)
     # TODO distinguish failure on no token and don't retry
 
-    def _get_access_token(self):
-        if self._auth_method == "username":
-            self._get_access_token_username()
-        elif self._auth_method == "api":
-            self._get_access_token_api()
-        else:
-            raise ValueError("auth_method must be 'username' or 'api'")
 
-    def _get_access_token_username(self):
-        _LOGGER.debug("Requesting authentication token (using username and password)")
-        authentication = {"email": self._username, "password": self._password, "version": VERSION}
-        req = requests.post(AUTH_SERVER,
-                            headers={"x-lwrf-appid": "ios-01"},
-                            json=authentication)
-        _LOGGER.debug("Received response: {}".format(req.json()))
-        if req.status_code == 200:
-            token = req.json()["tokens"]["access_token"]
-            self._authtoken = token
-        else:
-            _LOGGER.warning("No authentication token (status_code '{}').".format(req.status_code))
-            raise ConnectionError("No authentication token: {}".format(req.text))
-
-    # TODO check for token expiry
-    def _get_access_token_api(self):
-        _LOGGER.debug("Requesting authentication token (using API key and refresh token)")
-        authentication = {"grant_type": "refresh_token", "refresh_token": self._refresh_token}
-        req = requests.post(PUBLIC_AUTH_SERVER,
-                            headers={"authorization": "basic " + self._api_token},
-                            json=authentication)
-        _LOGGER.debug("Received response: {}".format(req))
-        if req.status_code == 200:
-            self._authtoken = req.json()["access_token"]
-            self._refresh_token = req.json()["refresh_token"]
-            self._token_expiry = datetime.datetime.now() + datetime.timedelta(seconds=req.json()["expires_in"])
-        else:
-            _LOGGER.warning("No authentication token (status_code '{}').".format(req.status_code))
-            raise ConnectionError("No authentication token: {}".format(req.text))
