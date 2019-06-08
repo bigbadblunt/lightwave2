@@ -492,9 +492,15 @@ class LWLink2Public(LWLink2):
 
         await self.async_update_featureset_states()
 
-    # TODO ######################################
     async def async_register_callback(self, callback):
         pass
+
+    async def async_register_webhook(self, url, feature_id, ref):
+        payload = {"events": [{"type": "feature", "id": feature_id}],
+                    "url": url,
+                    "ref": ref}
+        req = await. self._async_postrequest("events", payload)
+        #TODO: test for req = 200
 
     async def async_update_featureset_states(self):
         feature_list = []
