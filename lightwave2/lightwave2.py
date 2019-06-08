@@ -462,6 +462,13 @@ class LWLink2Public(LWLink2):
         _LOGGER.debug("Received API response {}".format(req.json()))
         return req.json()
 
+    async def _async_deleterequest(self, endpoint, _retry=1):
+        _LOGGER.debug("Sending API DELETE request to {}: {}".format(endpoint))
+        req = requests.delete(PUBLIC_API + endpoint,
+                            headers={"authorization": "bearer " + self._authtoken})
+        _LOGGER.debug("Received API response {}".format(req.json()))
+        return req.json()
+
     async def async_get_hierarchy(self):
 
         self.featuresets = {}
@@ -495,7 +502,9 @@ class LWLink2Public(LWLink2):
     async def async_register_callback(self, callback):
         pass
 
-    async def async_register_webhook(self, url, feature_id, ref):
+    async def async_register_webhook(self, url, feature_id, ref, overwrite = False):
+        if overwrite:
+            req = await self._async_deleterequest("events/" + ref)
         payload = {"events": [{"type": "feature", "id": feature_id}],
                     "url": url,
                     "ref": ref}
