@@ -16,6 +16,7 @@ MAX_RETRIES = 5
 PUBLIC_AUTH_SERVER = "https://auth.lightwaverf.com/token"
 PUBLIC_API = "https://publicapi.lightwaverf.com/v1/"
 
+
 class _LWRFMessage:
     _tran_id = 0
     _sender_id = str(uuid.uuid4())
@@ -44,6 +45,7 @@ class _LWRFMessageItem:
         _LWRFMessageItem._item_id += 1
         self._item["payload"] = payload
 
+
 class _LWRFFeatureSet:
 
     def __init__(self):
@@ -56,6 +58,7 @@ class _LWRFFeatureSet:
         self._climate = False
         self._gen2 = False
         self._power_reporting = False
+        self._cover = False
 
     def is_switch(self):
         return self._switchable and not self._dimmable
@@ -66,11 +69,15 @@ class _LWRFFeatureSet:
     def is_climate(self):
         return self._climate
 
+    def is_cover(self):
+        return self._cover
+
     def is_gen2(self):
         return self._gen2
 
     def reports_power(self):
         return self._power_reporting
+
 
 class LWLink2:
 
@@ -84,7 +91,7 @@ class LWLink2:
 
         self._session = aiohttp.ClientSession()
 
-        #Websocket only variables:
+        # Websocket only variables:
         self._device_id = str(uuid.uuid4())
         self._websocket = None
         self._callback = []
@@ -157,7 +164,7 @@ class LWLink2:
                     else:
                         _LOGGER.warning("Received unhandled message: %s", message)
                 elif mess.type == aiohttp.WSMsgType.CLOSED:
-                # We're not going to get a response, so clear response flag to allow _send_message to unblock
+                    # We're not going to get a response, so clear response flag to allow _send_message to unblock
                     _LOGGER.debug("Websocket closed in message handler")
                     self._waitingforresponse.set()
                     self._transactions = None
@@ -166,7 +173,6 @@ class LWLink2:
                     asyncio.ensure_future(self.async_connect())
             except AttributeError:  # websocket is None if not set up, just wait for a while
                 yield from asyncio.sleep(1)
-
 
     async def async_register_callback(self, callback):
         _LOGGER.debug("Register callback %s", callback)
@@ -209,7 +215,7 @@ class LWLink2:
                         _LOGGER.debug("Creating device {}".format(x))
                         new_featureset = _LWRFFeatureSet()
                         new_featureset.featureset_id = z
-                        new_featureset.product_code = "Not working" #TODO!
+                        new_featureset.product_code = "Not working"  # TODO!
                         new_featureset.name = x["name"]
                         self.featuresets[z] = new_featureset
 
@@ -226,6 +232,8 @@ class LWLink2:
                         y._gen2 = True
                     if x["attributes"]["type"] == "power":
                         y._power_reporting = True
+                    if x["attributes"]["type"] == "threeWayRelay":
+                        y._cover = True
 
     async def async_update_featureset_states(self):
         for dummy, x in self.featuresets.items():
@@ -281,6 +289,21 @@ class LWLink2:
         feature_id = y.features["targetTemperature"][0]
         await self.async_write_feature(feature_id, int(level * 10))
 
+    async def async_cover_open_by_featureset_id(self, featureset_id):
+        y = self.get_featureset_by_id(featureset_id)
+        feature_id = y.features["threeWayRelay"][0]
+        await self.async_write_feature(feature_id, 1)
+
+    async def async_cover_close_by_featureset_id(self, featureset_id):
+        y = self.get_featureset_by_id(featureset_id)
+        feature_id = y.features["threeWayRelay"][0]
+        await self.async_write_feature(feature_id, 2)
+
+    async def async_cover_stop_by_featureset_id(self, featureset_id):
+        y = self.get_featureset_by_id(featureset_id)
+        feature_id = y.features["threeWayRelay"][0]
+        await self.async_write_feature(feature_id, 0)
+
     def get_switches(self):
         temp = []
         for dummy, x in self.featuresets.items():
@@ -299,6 +322,13 @@ class LWLink2:
         temp = []
         for dummy, x in self.featuresets.items():
             if x.is_climate():
+                temp.append((x.featureset_id, x.name))
+        return temp
+
+    def get_covers(self):
+        temp = []
+        for dummy, x in self.featuresets.items():
+            if x.is_cover():
                 temp.append((x.featureset_id, x.name))
         return temp
 
@@ -327,11 +357,11 @@ class LWLink2:
             response = await self._async_sendmessage(authmess)
             if not response["items"][0]["success"]:
                 if response["items"][0]["error"]["code"] == "200":
-                    #"Channel is already authenticated" - Do nothing
+                    # "Channel is already authenticated" - Do nothing
                     pass
                 elif response["items"][0]["error"]["code"] == 405:
-                    #"Access denied" - bogus token, let's reauthenticate
-                    #Lightwave seems to return a string for 200 but an int for 405!
+                    # "Access denied" - bogus token, let's reauthenticate
+                    # Lightwave seems to return a string for 200 but an int for 405!
                     _LOGGER.debug("Authentication token rejected, regenerating and reauthenticating")
                     self._authtoken = None
                     await self._authenticate()
@@ -387,8 +417,18 @@ class LWLink2:
     def set_temperature_by_featureset_id(self, featureset_id, level):
         return asyncio.get_event_loop().run_until_complete(self.async_set_temperature_by_featureset_id(featureset_id, level))
 
+    def turn_cover_open_by_featureset_id(self, featureset_id):
+        return asyncio.get_event_loop().run_until_complete(self.async_cover_open_by_featureset_id(featureset_id))
+
+    def turn_cover_close_by_featureset_id(self, featureset_id):
+        return asyncio.get_event_loop().run_until_complete(self.async_cover_close_by_featureset_id(featureset_id))
+
+    def turn_cover_stop_by_featureset_id(self, featureset_id):
+        return asyncio.get_event_loop().run_until_complete(self.async_cover_stop_by_featureset_id(featureset_id))
+
     def connect(self):
         return asyncio.get_event_loop().run_until_complete(self.async_connect())
+
 
 class LWLink2Public(LWLink2):
 
@@ -406,8 +446,8 @@ class LWLink2Public(LWLink2):
         self._session = aiohttp.ClientSession()
         self._token_expiry = None
 
-    #TODO add retries/error checking
-    #TODO make this async!
+    # TODO add retries/error checking
+    # TODO make this async!
     async def _async_getrequest(self, endpoint, _retry=1):
         _LOGGER.debug("Sending API GET request to {}".format(endpoint))
         req = requests.get(PUBLIC_API + endpoint,
@@ -461,8 +501,8 @@ class LWLink2Public(LWLink2):
 
         for dummy, x in self.featuresets.items():
             for y in x.features:
-                feature_list.append({"featureId":x.features[y][0]})
-        body = {"features":feature_list}
+                feature_list.append({"featureId": x.features[y][0]})
+        body = {"features": feature_list}
         req = await self._async_postrequest("features/read", body)
 
         for featuresetid in self.featuresets:
@@ -490,7 +530,7 @@ class LWLink2Public(LWLink2):
             _LOGGER.warning("Cannot connect (exception '{}'). Waiting {} seconds".format(exp, retry_delay))
             await asyncio.sleep(retry_delay)
             return await self.async_connect(tries + 1)
-    #TODO distinguish failure on no token and don't retry
+    # TODO distinguish failure on no token and don't retry
 
     def _get_access_token(self):
         if self._auth_method == "username":
@@ -514,7 +554,7 @@ class LWLink2Public(LWLink2):
             _LOGGER.warning("No authentication token (status_code '{}').".format(req.status_code))
             raise ConnectionError("No authentication token: {}".format(req.text))
 
-    #TODO check for token expiry
+    # TODO check for token expiry
     def _get_access_token_api(self):
         _LOGGER.debug("Requesting authentication token (using API key and refresh token)")
         authentication = {"grant_type": "refresh_token", "refresh_token": self._refresh_token}
