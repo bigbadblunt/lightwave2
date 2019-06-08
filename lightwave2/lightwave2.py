@@ -17,14 +17,14 @@ PUBLIC_AUTH_SERVER = "https://auth.lightwaverf.com/token"
 PUBLIC_API = "https://publicapi.lightwaverf.com/v1/"
 
 
-class _LWRFMessage:
+class _LWRFWebsocketMessage:
     _tran_id = 0
     _sender_id = str(uuid.uuid4())
 
     def __init__(self, opclass, operation):
         self._message = {"class": opclass, "operation": operation, "version": 1, "senderId": self._sender_id,
-                         "transactionId": _LWRFMessage._tran_id}
-        _LWRFMessage._tran_id += 1
+                         "transactionId": _LWRFWebsocketMessage._tran_id}
+        _LWRFWebsocketMessage._tran_id += 1
         self._message["direction"] = "request"
         self._message["items"] = []
 
@@ -35,18 +35,18 @@ class _LWRFMessage:
         return json.dumps(self._message)
 
 
-class _LWRFMessageItem:
+class _LWRFWebsocketMessageItem:
     _item_id = 0
 
     def __init__(self, payload=None):
         if payload is None:
             payload = {}
-        self._item = {"itemId": _LWRFMessageItem._item_id}
-        _LWRFMessageItem._item_id += 1
+        self._item = {"itemId": _LWRFWebsocketMessageItem._item_id}
+        _LWRFWebsocketMessageItem._item_id += 1
         self._item["payload"] = payload
 
 
-class _LWRFFeatureSet:
+class LWRFFeatureSet:
 
     def __init__(self):
         self.featureset_id = None
@@ -185,8 +185,8 @@ class LWLink2:
 
     async def async_get_hierarchy(self):
         _LOGGER.debug("Reading hierarchy")
-        readmess = _LWRFMessage("user", "rootGroups")
-        readitem = _LWRFMessageItem()
+        readmess = _LWRFWebsocketMessage("user", "rootGroups")
+        readitem = _LWRFWebsocketMessageItem()
         readmess.additem(readitem)
         response = await self._async_sendmessage(readmess)
 
@@ -202,8 +202,8 @@ class LWLink2:
     async def _async_read_groups(self):
         self.featuresets = {}
         for groupId in self._group_ids:
-            readmess = _LWRFMessage("group", "read")
-            readitem = _LWRFMessageItem({"groupId": groupId,
+            readmess = _LWRFWebsocketMessage("group", "read")
+            readitem = _LWRFWebsocketMessageItem({"groupId": groupId,
                                          "blocks": True,
                                          "devices": True,
                                          "features": True,
@@ -218,7 +218,7 @@ class LWLink2:
 
                     if z not in self.featuresets:
                         _LOGGER.debug("Creating device {}".format(x))
-                        new_featureset = _LWRFFeatureSet()
+                        new_featureset = LWRFFeatureSet()
                         new_featureset.featureset_id = z
                         new_featureset.product_code = "Not working"  # TODO!
                         new_featureset.name = x["name"]
@@ -247,14 +247,14 @@ class LWLink2:
                 x.features[y][1] = value["items"][0]["payload"]["value"]
 
     async def async_write_feature(self, feature_id, value):
-        readmess = _LWRFMessage("feature", "write")
-        readitem = _LWRFMessageItem({"featureId": feature_id, "value": value})
+        readmess = _LWRFWebsocketMessage("feature", "write")
+        readitem = _LWRFWebsocketMessageItem({"featureId": feature_id, "value": value})
         readmess.additem(readitem)
         await self._async_sendmessage(readmess)
 
     async def async_read_feature(self, feature_id):
-        readmess = _LWRFMessage("feature", "read")
-        readitem = _LWRFMessageItem({"featureId": feature_id})
+        readmess = _LWRFWebsocketMessage("feature", "read")
+        readitem = _LWRFWebsocketMessageItem({"featureId": feature_id})
         readmess.additem(readitem)
         return await self._async_sendmessage(readmess)
 
@@ -356,8 +356,8 @@ class LWLink2:
         if not self._authtoken:
             await self._get_access_token()
         if self._authtoken:
-            authmess = _LWRFMessage("user", "authenticate")
-            authpayload = _LWRFMessageItem({"token": self._authtoken, "clientDeviceId": self._device_id})
+            authmess = _LWRFWebsocketMessage("user", "authenticate")
+            authpayload = _LWRFWebsocketMessageItem({"token": self._authtoken, "clientDeviceId": self._device_id})
             authmess.additem(authpayload)
             response = await self._async_sendmessage(authmess)
             if not response["items"][0]["success"]:
@@ -507,7 +507,7 @@ class LWLink2Public(LWLink2):
             for x in response["devices"]:
                 for y in x["featureSets"]:
                     _LOGGER.debug("Creating device {}".format(x))
-                    new_featureset = _LWRFFeatureSet()
+                    new_featureset = LWRFFeatureSet()
                     new_featureset.featureset_id = y["featureSetId"]
                     new_featureset.product_code = x["productCode"]
                     new_featureset.name = x["name"]
