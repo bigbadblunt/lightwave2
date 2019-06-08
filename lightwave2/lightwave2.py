@@ -463,7 +463,7 @@ class LWLink2Public(LWLink2):
         return req.json()
 
     async def _async_deleterequest(self, endpoint, _retry=1):
-        _LOGGER.debug("Sending API DELETE request to {}: {}".format(endpoint))
+        _LOGGER.debug("Sending API DELETE request to {}".format(endpoint))
         req = requests.delete(PUBLIC_API + endpoint,
                             headers={"authorization": "bearer " + self._authtoken})
         _LOGGER.debug("Received API response {}".format(req.json()))
