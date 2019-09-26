@@ -226,7 +226,7 @@ class LWLink2:
 
                     _LOGGER.debug("Adding device features {}".format(x))
                     y = self.featuresets[z]
-                    y.features[x["attributes"]["type"]] = [x["featureId"], x["attributes"]["value"]]
+                    y.features[x["attributes"]["type"]] = [x["featureId"], 0] #Something has changed meaning the server doesn't return values on first call
                     if x["attributes"]["type"] == "switch":
                         y._switchable = True
                     if x["attributes"]["type"] == "dimLevel":
