@@ -15,6 +15,8 @@ VERSION = "1.6.8"
 MAX_RETRIES = 5
 PUBLIC_AUTH_SERVER = "https://auth.lightwaverf.com/token"
 PUBLIC_API = "https://publicapi.lightwaverf.com/v1/"
+RGB_FLOOR = int("0x1B", 16) #Lightwave app seems to floor RGB values here, let's do the same
+
 
 
 class _LWRFWebsocketMessage:
@@ -58,6 +60,7 @@ class LWRFFeatureSet:
         self._climate = False
         self._gen2 = False
         self._power_reporting = False
+        self._has_led = False
         self._cover = False
 
     def is_switch(self):
@@ -77,6 +80,9 @@ class LWRFFeatureSet:
 
     def reports_power(self):
         return self._power_reporting
+
+    def has_led(self):
+        return self._has_led
 
 
 class LWLink2:
@@ -237,6 +243,8 @@ class LWLink2:
                         y._gen2 = True
                     if x["attributes"]["type"] == "power":
                         y._power_reporting = True
+                    if x["attributes"]["type"] == "rgbColor":
+                        y._has_led = True
                     if x["attributes"]["type"] == "threeWayRelay":
                         y._cover = True
 
@@ -308,6 +316,15 @@ class LWLink2:
         y = self.get_featureset_by_id(featureset_id)
         feature_id = y.features["threeWayRelay"][0]
         await self.async_write_feature(feature_id, 0)
+
+    async def async_set_led_rgb_by_featureset_id(self, featureset_id, color):
+        red = min(max((color & int("0xFF0000")) >> 16, RGB_FLOOR), 255)
+        green = min(max((color & int("0xFF00")) >> 8, RGB_FLOOR), 255)
+        blue = min(max((color & int("0xFF")), RGB_FLOOR), 255)
+        newcolor = (red << 16) + (green << 8) + blue
+        y = self.get_featureset_by_id(featureset_id)
+        feature_id = y.features["rgbColor"][0]
+        await self.async_write_feature(feature_id, newcolor)
 
     def get_switches(self):
         temp = []
@@ -446,13 +463,13 @@ class LWLink2:
     def set_temperature_by_featureset_id(self, featureset_id, level):
         return asyncio.get_event_loop().run_until_complete(self.async_set_temperature_by_featureset_id(featureset_id, level))
 
-    def turn_cover_open_by_featureset_id(self, featureset_id):
+    def cover_open_by_featureset_id(self, featureset_id):
         return asyncio.get_event_loop().run_until_complete(self.async_cover_open_by_featureset_id(featureset_id))
 
-    def turn_cover_close_by_featureset_id(self, featureset_id):
+    def cover_close_by_featureset_id(self, featureset_id):
         return asyncio.get_event_loop().run_until_complete(self.async_cover_close_by_featureset_id(featureset_id))
 
-    def turn_cover_stop_by_featureset_id(self, featureset_id):
+    def cover_stop_by_featureset_id(self, featureset_id):
         return asyncio.get_event_loop().run_until_complete(self.async_cover_stop_by_featureset_id(featureset_id))
 
     def connect(self):
