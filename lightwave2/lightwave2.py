@@ -318,9 +318,9 @@ class LWLink2:
         await self.async_write_feature(feature_id, 0)
 
     async def async_set_led_rgb_by_featureset_id(self, featureset_id, color):
-        red = min(max((color & int("0xFF0000")) >> 16, RGB_FLOOR), 255)
-        green = min(max((color & int("0xFF00")) >> 8, RGB_FLOOR), 255)
-        blue = min(max((color & int("0xFF")), RGB_FLOOR), 255)
+        red = min(max((color & int("0xFF0000", 16)) >> 16, RGB_FLOOR), 255)
+        green = min(max((color & int("0xFF00", 16)) >> 8, RGB_FLOOR), 255)
+        blue = min(max((color & int("0xFF", 16)), RGB_FLOOR), 255)
         newcolor = (red << 16) + (green << 8) + blue
         y = self.get_featureset_by_id(featureset_id)
         feature_id = y.features["rgbColor"][0]
