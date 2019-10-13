@@ -1,4 +1,4 @@
-import requests
+import requests #TODO replace all requests with aiohttp
 import asyncio
 import uuid
 import json
@@ -17,7 +17,7 @@ PUBLIC_AUTH_SERVER = "https://auth.lightwaverf.com/token"
 PUBLIC_API = "https://publicapi.lightwaverf.com/v1/"
 RGB_FLOOR = int("0x1B", 16) #Lightwave app seems to floor RGB values here, let's do the same
 
-
+#TODO adapt async_connect calls to respond to connection failure
 
 class _LWRFWebsocketMessage:
     _tran_id = 0
@@ -364,16 +364,21 @@ class LWLink2:
     # Connection
     #########################################################
 
-    async def async_connect(self, tries=0):
+    async def async_connect(self, max_tries=5, _retry=0):
         try:
-            if not self._websocket or self._websocket.closed:
+            if (not self._websocket) or self._websocket.closed:
+                _LOGGER.debug("Connecting to websocket")
                 self._websocket = await self._session.ws_connect(TRANS_SERVER)
             return await self._authenticate_websocket()
         except Exception as exp:
-            retry_delay = min(2 ** (tries + 1), 120)
-            _LOGGER.warning("Cannot connect (exception '{}'). Waiting {} seconds".format(exp, retry_delay))
-            await asyncio.sleep(retry_delay)
-            return await self.async_connect(tries + 1)
+            if (max_tries == 0) or (_retry < max_tries):
+                retry_delay = min(2 ** (_retry + 1), 120)
+                _LOGGER.warning("Cannot connect (exception '{}'). Waiting {} seconds to retry".format(exp, retry_delay))
+                await asyncio.sleep(retry_delay)
+                return await self.async_connect(_retry + 1)
+            else:
+                _LOGGER.warning("Cannot connect, max_tries exceeded, aborting")
+                return False
 
     async def _authenticate_websocket(self):
         if not self._authtoken:
@@ -592,14 +597,14 @@ class LWLink2Public(LWLink2):
     # Connection
     #########################################################
 
-    async def async_connect(self, tries=0):
+    async def async_connect(self, _retry=0):
         try:
             await self._get_access_token()
         except Exception as exp:
-            retry_delay = min(2 ** (tries + 1), 120)
+            retry_delay = min(2 ** (_retry + 1), 120)
             _LOGGER.warning("Cannot connect (exception '{}'). Waiting {} seconds".format(exp, retry_delay))
             await asyncio.sleep(retry_delay)
-            return await self.async_connect(tries + 1)
+            return await self.async_connect(_retry + 1)
     # TODO distinguish failure on no token and don't retry
 
 
