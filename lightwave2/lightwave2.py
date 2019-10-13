@@ -375,7 +375,7 @@ class LWLink2:
                 retry_delay = min(2 ** (_retry + 1), 120)
                 _LOGGER.warning("Cannot connect (exception '{}'). Waiting {} seconds to retry".format(exp, retry_delay))
                 await asyncio.sleep(retry_delay)
-                return await self.async_connect(_retry + 1)
+                return await self.async_connect(max_tries, _retry + 1)
             else:
                 _LOGGER.warning("Cannot connect, max_tries exceeded, aborting")
                 return False
