@@ -599,7 +599,7 @@ class LWLink2Public(LWLink2):
 
     async def async_connect(self, max_tries=5, _retry=0):
         try:
-            await self._get_access_token()
+            return await self._get_access_token()
         except Exception as exp:
             if (max_tries == 0) or (_retry < max_tries):
                 retry_delay = min(2 ** (_retry + 1), 120)
