@@ -597,14 +597,18 @@ class LWLink2Public(LWLink2):
     # Connection
     #########################################################
 
-    async def async_connect(self, _retry=0):
+    async def async_connect(self, max_tries=5, _retry=0):
         try:
             await self._get_access_token()
         except Exception as exp:
-            retry_delay = min(2 ** (_retry + 1), 120)
-            _LOGGER.warning("Cannot connect (exception '{}'). Waiting {} seconds".format(exp, retry_delay))
-            await asyncio.sleep(retry_delay)
-            return await self.async_connect(_retry + 1)
+            if (max_tries == 0) or (_retry < max_tries):
+                retry_delay = min(2 ** (_retry + 1), 120)
+                _LOGGER.warning("Cannot connect (exception '{}'). Waiting {} seconds".format(exp, retry_delay))
+                await asyncio.sleep(retry_delay)
+                return await self.async_connect(_retry + 1)
+            else:
+                _LOGGER.warning("Cannot connect, max_tries exceeded, aborting")
+                return False
     # TODO distinguish failure on no token and don't retry
 
 

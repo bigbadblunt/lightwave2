@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="lightwave2",
-    version="0.5.1",
+    version="0.5.2",
     author="Bryan Blunt",
     author_email="bryan@blunt.me.uk",
     description="Controls for Lightwave RF second generation devices",
