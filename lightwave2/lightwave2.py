@@ -506,24 +506,27 @@ class LWLink2Public(LWLink2):
     # TODO add retries/error checking
     async def _async_getrequest(self, endpoint, _retry=1):
         _LOGGER.debug("Sending API GET request to {}".format(endpoint))
-        req = requests.get(PUBLIC_API + endpoint,
-                           headers={"authorization": "bearer " + self._authtoken})
-        _LOGGER.debug("Received API response {}".format(req.json()))
-        return req.json()
+        async with self._session.get(PUBLIC_API + endpoint,
+                                     headers= {"authorization": "bearer " + self._authtoken}
+                                      ) as req:
+            _LOGGER.debug("Received API response {}".format(req.json()))
+            return req.json()
 
     async def _async_postrequest(self, endpoint, body="", _retry=1):
         _LOGGER.debug("Sending API POST request to {}: {}".format(endpoint, body))
-        req = requests.post(PUBLIC_API + endpoint,
-                            headers={"authorization": "bearer " + self._authtoken}, json=body)
-        _LOGGER.debug("Received API response {}".format(req.json()))
-        return req.json()
+        async with self._session.post(PUBLIC_API + endpoint,
+                                      headers= {"authorization": "bearer " + self._authtoken},
+                                      json=body) as req:
+            _LOGGER.debug("Received API response {}".format(req.json()))
+            return req.json()
 
     async def _async_deleterequest(self, endpoint, _retry=1):
         _LOGGER.debug("Sending API DELETE request to {}".format(endpoint))
-        req = requests.delete(PUBLIC_API + endpoint,
-                            headers={"authorization": "bearer " + self._authtoken})
-        _LOGGER.debug("Received API response {}".format(req.json()))
-        return req.json()
+        async with self._session.get(PUBLIC_API + endpoint,
+                                     headers= {"authorization": "bearer " + self._authtoken}
+                                      ) as req:
+            _LOGGER.debug("Received API response {}".format(req.json()))
+            return req.json()
 
     async def async_get_hierarchy(self):
 
