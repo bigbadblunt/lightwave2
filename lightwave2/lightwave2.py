@@ -411,7 +411,7 @@ class LWLink2:
         if self._auth_method == "username":
             await self._get_access_token_username()
         elif self._auth_method == "api":
-            self._get_access_token_api()
+            await self._get_access_token_api()
         else:
             raise ValueError("auth_method must be 'username' or 'api'")
 
@@ -427,7 +427,7 @@ class LWLink2:
                 raise ConnectionError("No authentication token: {}".format(await req.text))
 
     # TODO check for token expiry
-    def _get_access_token_api(self):
+    async def _get_access_token_api(self):
         _LOGGER.debug("Requesting authentication token (using API key and refresh token)")
         authentication = {"grant_type": "refresh_token", "refresh_token": self._refresh_token}
         async with self._session.post(PUBLIC_AUTH_SERVER,
