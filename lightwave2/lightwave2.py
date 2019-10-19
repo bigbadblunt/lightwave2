@@ -1,4 +1,3 @@
-import requests #TODO replace all requests with aiohttp
 import asyncio
 import uuid
 import json
@@ -431,17 +430,17 @@ class LWLink2:
     def _get_access_token_api(self):
         _LOGGER.debug("Requesting authentication token (using API key and refresh token)")
         authentication = {"grant_type": "refresh_token", "refresh_token": self._refresh_token}
-        req = requests.post(PUBLIC_AUTH_SERVER,
+        async with self._session.post(PUBLIC_AUTH_SERVER,
                             headers={"authorization": "basic " + self._api_token},
-                            json=authentication)
-        _LOGGER.debug("Received response: {}".format(req))
-        if req.status_code == 200:
-            self._authtoken = req.json()["access_token"]
-            self._refresh_token = req.json()["refresh_token"]
-            self._token_expiry = datetime.datetime.now() + datetime.timedelta(seconds=req.json()["expires_in"])
-        else:
-            _LOGGER.warning("No authentication token (status_code '{}').".format(req.status_code))
-            raise ConnectionError("No authentication token: {}".format(req.text))
+                            json=authentication) as req:
+            _LOGGER.debug("Received response: {}".format(await req.text))
+            if req.status == 200:
+                self._authtoken = await req.json()["access_token"]
+                self._refresh_token = await req.json()["refresh_token"]
+                self._token_expiry = datetime.datetime.now() + datetime.timedelta(seconds=await req.json()["expires_in"])
+            else:
+                _LOGGER.warning("No authentication token (status_code '{}').".format(req.status))
+                raise ConnectionError("No authentication token: {}".format(await req.text))
 
     #########################################################
     # Convenience methods for non-async calls
