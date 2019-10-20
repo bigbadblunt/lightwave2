@@ -346,10 +346,7 @@ class LWLink2:
 
     async def async_connect(self, max_tries=5, _retry=0):
         try:
-            if (not self._websocket) or self._websocket.closed:
-                _LOGGER.debug("Connecting to websocket")
-                self._websocket = await self._session.ws_connect(TRANS_SERVER)
-            return await self._authenticate_websocket()
+            await self._connect_to_server()
         except Exception as exp:
             if (max_tries == 0) or (_retry < max_tries):
                 retry_delay = min(2 ** (_retry + 1), 120)
@@ -359,6 +356,12 @@ class LWLink2:
             else:
                 _LOGGER.warning("Cannot connect, max_tries exceeded, aborting")
                 return False
+
+    async def _connect_to_server(self):
+        if (not self._websocket) or self._websocket.closed:
+            _LOGGER.debug("Connecting to websocket")
+            self._websocket = await self._session.ws_connect(TRANS_SERVER)
+        return await self._authenticate_websocket()
 
     async def _authenticate_websocket(self):
         if not self._authtoken:
@@ -484,7 +487,7 @@ class LWLink2Public(LWLink2):
         self._session = aiohttp.ClientSession()
         self._token_expiry = None
 
-    # TODO add retries/error checking
+    # TODO add retries/error checking to public API requests
     async def _async_getrequest(self, endpoint, _retry=1):
         _LOGGER.debug("Sending API GET request to {}".format(endpoint))
         async with self._session.get(PUBLIC_API + endpoint,
@@ -578,19 +581,8 @@ class LWLink2Public(LWLink2):
     # Connection
     #########################################################
 
-    async def async_connect(self, max_tries=5, _retry=0):
-        try:
+    async def _connect_to_server(self):
             await self._get_access_token()
-        except Exception as exp:
-            if (max_tries == 0) or (_retry < max_tries):
-                retry_delay = min(2 ** (_retry + 1), 120)
-                _LOGGER.warning("Cannot connect (exception '{}'). Waiting {} seconds".format(exp, retry_delay))
-                await asyncio.sleep(retry_delay)
-                return await self.async_connect(_retry + 1)
-            else:
-                _LOGGER.warning("Cannot connect, max_tries exceeded, aborting")
-                return False
-        return True
-    # TODO distinguish failure on no token and don't retry
+
 
 
