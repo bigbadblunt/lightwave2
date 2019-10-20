@@ -1,4 +1,3 @@
-#TODO: add rgbled code to public API
 import asyncio
 import uuid
 import json
