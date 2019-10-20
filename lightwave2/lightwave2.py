@@ -488,7 +488,7 @@ class LWLink2Public(LWLink2):
         async with self._session.get(PUBLIC_API + endpoint,
                                      headers= {"authorization": "bearer " + self._authtoken}
                                       ) as req:
-            _LOGGER.debug("Received API response {}".format(await req.json()))
+            _LOGGER.debug("Received API response {} {} {}".format(req.status, await req.text(), await req.json()))
             return await req.json()
 
     async def _async_postrequest(self, endpoint, body="", _retry=1):
@@ -496,7 +496,7 @@ class LWLink2Public(LWLink2):
         async with self._session.post(PUBLIC_API + endpoint,
                                       headers= {"authorization": "bearer " + self._authtoken},
                                       json=body) as req:
-            _LOGGER.debug("Received API response {}".format(await req.json()))
+            _LOGGER.debug("Received API response {} {} {}".format(req.status, await req.text(), await req.json()))
             return await req.json()
 
     async def _async_deleterequest(self, endpoint, _retry=1):
@@ -504,7 +504,7 @@ class LWLink2Public(LWLink2):
         async with self._session.delete(PUBLIC_API + endpoint,
                                      headers= {"authorization": "bearer " + self._authtoken}
                                       ) as req:
-            _LOGGER.debug("Received API response {}".format(await req.json()))
+            _LOGGER.debug("Received API response {} {} {}".format(req.status, await req.text(), await req.json()))
             return await req.json()
 
     async def async_get_hierarchy(self):
