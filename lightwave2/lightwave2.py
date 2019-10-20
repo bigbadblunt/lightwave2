@@ -1,3 +1,4 @@
+#TODO: add rgbled code to public API
 import asyncio
 import uuid
 import json
@@ -54,34 +55,27 @@ class LWRFFeatureSet:
         self.name = None
         self.product_code = None
         self.features = {}
-        self._switchable = False
-        self._dimmable = False
-        self._climate = False
-        self._gen2 = False
-        self._power_reporting = False
-        self._has_led = False
-        self._cover = False
 
     def is_switch(self):
-        return self._switchable and not self._dimmable
+        return ('switch' in self.features.keys()) and not ('dimLevel' in self.features.keys())
 
     def is_light(self):
-        return self._dimmable
+        return 'dimLevel' in self.features.keys()
 
     def is_climate(self):
-        return self._climate
+        return 'targetTemperature' in self.features.keys()
 
     def is_cover(self):
-        return self._cover
+        return 'threeWayRelay' in self.features.keys()
 
     def is_gen2(self):
-        return self._gen2
+        return 'identify' in self.features.keys()
 
     def reports_power(self):
-        return self._power_reporting
+        return 'power' in self.features.keys()
 
     def has_led(self):
-        return self._has_led
+        return 'rgbColor' in self.features.keys()
 
 
 class LWLink2:
@@ -232,20 +226,6 @@ class LWLink2:
                     _LOGGER.debug("Adding device features {}".format(x))
                     y = self.featuresets[z]
                     y.features[x["attributes"]["type"]] = [x["featureId"], 0] #Something has changed meaning the server doesn't return values on first call
-                    if x["attributes"]["type"] == "switch":
-                        y._switchable = True
-                    if x["attributes"]["type"] == "dimLevel":
-                        y._dimmable = True
-                    if x["attributes"]["type"] == "targetTemperature":
-                        y._climate = True
-                    if x["attributes"]["type"] == "identify":
-                        y._gen2 = True
-                    if x["attributes"]["type"] == "power":
-                        y._power_reporting = True
-                    if x["attributes"]["type"] == "rgbColor":
-                        y._has_led = True
-                    if x["attributes"]["type"] == "threeWayRelay":
-                        y._cover = True
 
     async def async_update_featureset_states(self):
         for dummy, x in self.featuresets.items():
@@ -495,6 +475,7 @@ class LWLink2Public(LWLink2):
 
         self._username = username
         self._password = password
+
         self._auth_method = auth_method
         self._api_token = api_token
         self._refresh_token = refresh_token
@@ -545,18 +526,7 @@ class LWLink2Public(LWLink2):
                     for z in y["features"]:
                         _LOGGER.debug("Adding device features {}".format(z))
                         new_featureset.features[z["type"]] = [z["featureId"], None]
-                        if z["type"] == "switch":
-                            new_featureset._switchable = True
-                        if z["type"] == "dimLevel":
-                            new_featureset._dimmable = True
-                        if z["type"] == "targetTemperature":
-                            new_featureset._climate = True
-                        if z["type"] == "identify":
-                            new_featureset._gen2 = True
-                        if z["type"] == "power":
-                            new_featureset._power_reporting = True
-                        if z["type"] == "threeWayRelay":
-                            new_featureset._cover = True
+
                     self.featuresets[y["featureSetId"]] = new_featureset
 
         await self.async_update_featureset_states()
