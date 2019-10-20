@@ -218,13 +218,15 @@ class LWLink2:
                         _LOGGER.debug("Creating device {}".format(x))
                         new_featureset = LWRFFeatureSet()
                         new_featureset.featureset_id = z
-                        new_featureset.product_code = "Not working"  # TODO!
                         new_featureset.name = x["name"]
                         self.featuresets[z] = new_featureset
 
                     _LOGGER.debug("Adding device features {}".format(x))
                     y = self.featuresets[z]
                     y.features[x["attributes"]["type"]] = [x["featureId"], 0] #Something has changed meaning the server doesn't return values on first call
+
+            for x in list(response["items"][0]["payload"]["devices"].values()):
+                self.get_featureset_by_featureid(x['featureIds'][0]).product_code = x['productCode']
 
     async def async_update_featureset_states(self):
         for dummy, x in self.featuresets.items():
