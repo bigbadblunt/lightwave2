@@ -502,7 +502,19 @@ class LWLink2Public(LWLink2):
                                       headers= {"authorization": "bearer " + self._authtoken},
                                       json=body) as req:
             _LOGGER.debug("Received API response {} {} {}".format(req.status, await req.text(), await req.json()))
+            if not(req.status == 401 and await req.json()['message'] == 'Unauthorized'):
+                return await req.json()
+        try:
+            _LOGGER.debug("POST failed due to unauthorized connection, retrying connect")
+            await self.async_connect()
+            async with self._session.post(PUBLIC_API + endpoint,
+                                          headers={
+                                              "authorization": "bearer " + self._authtoken},
+                                          json=body) as req:
+            _LOGGER.debug("Received API response {} {} {}".format(req.status, await req.text(), await req.json()))
             return await req.json()
+        except:
+            return False
 
     async def _async_deleterequest(self, endpoint, _retry=1):
         _LOGGER.debug("Sending API DELETE request to {}".format(endpoint))
