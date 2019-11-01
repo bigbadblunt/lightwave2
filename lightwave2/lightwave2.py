@@ -511,8 +511,8 @@ class LWLink2Public(LWLink2):
                                           headers={
                                               "authorization": "bearer " + self._authtoken},
                                           json=body) as req:
-            _LOGGER.debug("Received API response {} {} {}".format(req.status, await req.text(), await req.json()))
-            return await req.json()
+                _LOGGER.debug("Received API response {} {} {}".format(req.status, await req.text(), await req.json()))
+                return await req.json()
         except:
             return False
 
