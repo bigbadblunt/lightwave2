@@ -68,13 +68,17 @@ Is this featureset a (non-light) switch:
     
     print(link.featuresets['5bc4d06e87779374d29d7d9a-5bc4d61387779374d29fdd1e'].is_switch())
 
-Or is is a light switch:
+Or it is a light switch:
 
     print(link.featuresets['5bc4d06e87779374d29d7d9a-5bc4d61387779374d29fdd1e'].is_light())
     
 Maybe it's a thermostat:
 
     print(link.featuresets['5bc4d06e87779374d29d7d9a-5bc4d61387779374d29fdd1e'].is_climate())
+
+Or perhaps an energy meter:
+
+    print(link.featuresets['5bc4d06e87779374d29d7d9a-5bc4d61387779374d29fdd1e'].is_energy())
     
 Is it a generation 2 ("Smart series") device:
     
@@ -107,6 +111,7 @@ Finally there are a handful of convenience methods if you just want to return de
     print(link.get_switches())
     print(link.get_lights())
     print(link.get_climates())
+    print(link.get_energy())
 
 #### Writing to a feature
 Turning on a switch/light, turning off a switch/light or setting the brightness level for a light is as follows:
