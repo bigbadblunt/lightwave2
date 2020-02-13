@@ -70,6 +70,9 @@ class LWRFFeatureSet:
     def is_energy(self):
         return ('energy' in self.features.keys()) and ('rssi' in self.features.keys())
 
+    def is_windowsensor(self):
+        return 'windowPosition' in self.features.keys()
+
     def is_gen2(self):
         return 'identify' in self.features.keys()
 
@@ -347,6 +350,13 @@ class LWLink2:
         temp = []
         for dummy, x in self.featuresets.items():
             if x.is_energy():
+                temp.append((x.featureset_id, x.name))
+        return temp
+
+    def get_windowsensors(self):
+        temp = []
+        for dummy, x in self.featuresets.items():
+            if x.is_windowsensor():
                 temp.append((x.featureset_id, x.name))
         return temp
 
