@@ -319,46 +319,22 @@ class LWLink2:
         await self.async_write_feature(feature_id, newcolor)
 
     def get_switches(self):
-        temp = []
-        for dummy, x in self.featuresets.items():
-            if x.is_switch():
-                temp.append((x.featureset_id, x.name))
-        return temp
+        return [(x.featureset_id, x.name) for x in self.featuresets.values() if x.is_switch()]
 
     def get_lights(self):
-        temp = []
-        for dummy, x in self.featuresets.items():
-            if x.is_light():
-                temp.append((x.featureset_id, x.name))
-        return temp
+        return [(x.featureset_id, x.name) for x in self.featuresets.values() if x.is_light()]
 
     def get_climates(self):
-        temp = []
-        for dummy, x in self.featuresets.items():
-            if x.is_climate():
-                temp.append((x.featureset_id, x.name))
-        return temp
+        return [(x.featureset_id, x.name) for x in self.featuresets.values() if x.is_climate()]
 
     def get_covers(self):
-        temp = []
-        for dummy, x in self.featuresets.items():
-            if x.is_cover():
-                temp.append((x.featureset_id, x.name))
-        return temp
+        return [(x.featureset_id, x.name) for x in self.featuresets.values() if x.is_cover()]
 
     def get_energy(self):
-        temp = []
-        for dummy, x in self.featuresets.items():
-            if x.is_energy():
-                temp.append((x.featureset_id, x.name))
-        return temp
+        return [(x.featureset_id, x.name) for x in self.featuresets.values() if x.is_energy()]
 
     def get_windowsensors(self):
-        temp = []
-        for dummy, x in self.featuresets.items():
-            if x.is_windowsensor():
-                temp.append((x.featureset_id, x.name))
-        return temp
+        return [(x.featureset_id, x.name) for x in self.featuresets.values() if x.is_windowsensor()]
 
     #########################################################
     # Connection
@@ -578,6 +554,11 @@ class LWLink2Public(LWLink2):
                     "ref": ref}
         req = await self._async_postrequest("events", payload)
         #TODO: test for req = 200
+
+    async def delete_all_webhooks(self):
+        webhooks = await self._async_getrequest("events")
+        for wh in webhooks:
+            await self._async_deleterequest("events/" + wh["id"])
 
     def process_webhook_received(self, body):
 
