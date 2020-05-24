@@ -569,6 +569,10 @@ class LWLink2Public(LWLink2):
         req = await self._async_postrequest("events", payload)
         #TODO: test for req = 200
 
+    async def async_delete_webhook(self, ref):
+        req = await self._async_deleterequest("events/" + ref)
+        #TODO: test for req = 200
+
     def process_webhook_received(self, body):
 
         featureid = body['triggerEvent']['id']
