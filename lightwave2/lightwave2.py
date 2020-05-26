@@ -73,6 +73,9 @@ class LWRFFeatureSet:
     def is_windowsensor(self):
         return 'windowPosition' in self.features.keys()
 
+    def is_hub(self):
+        return 'buttonPress' in self.features.keys()
+
     def is_gen2(self):
         return 'identify' in self.features.keys()
 
@@ -335,6 +338,9 @@ class LWLink2:
 
     def get_windowsensors(self):
         return [(x.featureset_id, x.name) for x in self.featuresets.values() if x.is_windowsensor()]
+
+    def get_hubs(self):
+        return [(x.featureset_id, x.name) for x in self.featuresets.values() if x.is_hub()]
 
     #########################################################
     # Connection
