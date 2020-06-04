@@ -64,6 +64,9 @@ class LWRFFeatureSet:
     def is_climate(self):
         return 'targetTemperature' in self.features.keys()
 
+    def is_trv(self):
+        return 'valveSetup' in self.features.keys()
+
     def is_cover(self):
         return 'threeWayRelay' in self.features.keys()
 
@@ -290,6 +293,11 @@ class LWLink2:
         y = self.get_featureset_by_id(featureset_id)
         feature_id = y.features["targetTemperature"][0]
         await self.async_write_feature(feature_id, int(level * 10))
+
+    async def async_set_valvelevel_by_featureset_id(self, featureset_id, level):
+        y = self.get_featureset_by_id(featureset_id)
+        feature_id = y.features["valveLevel"][0]
+        await self.async_write_feature(feature_id, int(level * 20))
 
     async def async_cover_open_by_featureset_id(self, featureset_id):
         y = self.get_featureset_by_id(featureset_id)
