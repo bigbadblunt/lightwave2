@@ -592,13 +592,20 @@ class LWLink2Public(LWLink2):
         for dummy, x in self.featuresets.items():
             for y in x.features:
                 feature_list.append({"featureId": x.features[y][0]})
-        body = {"features": feature_list}
-        req = await self._async_postrequest("features/read", body)
 
-        for featuresetid in self.featuresets:
-            for featurename in self.featuresets[featuresetid].features:
-                if self.featuresets[featuresetid].features[featurename][0] in req:
-                    self.featuresets[featuresetid].features[featurename][1] = req[self.featuresets[featuresetid].features[featurename][0]]
+        #split up the feature list into chunks as the public API doesn't like requests that are too long
+        #200 seems safe
+        #if the request is too long, will get 404 response {"message":"Structure not found"}
+        MAX_REQUEST_LENGTH = 200
+        feature_list_split = [feature_list[i:i + MAX_REQUEST_LENGTH] for i in range(0, len(feature_list), MAX_REQUEST_LENGTH)]
+        for feat_list in feature_list_split:
+            body = {"features": feat_list}
+            req = await self._async_postrequest("features/read", body)
+
+            for featuresetid in self.featuresets:
+                for featurename in self.featuresets[featuresetid].features:
+                    if self.featuresets[featuresetid].features[featurename][0] in req:
+                        self.featuresets[featuresetid].features[featurename][1] = req[self.featuresets[featuresetid].features[featurename][0]]
 
     async def async_write_feature(self, feature_id, value):
         payload = {"value": value}
