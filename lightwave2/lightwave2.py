@@ -128,6 +128,7 @@ class LWLink2:
 
         _LOGGER.debug("Sending: %s", message.json())
         await self._websocket.send_str(message.json())
+        _LOGGER.debug("Message sent, waiting for acknowledgement from server")
         self._transaction = message._message["transactionId"]
         self._waitingforresponse.clear()
         await self._waitingforresponse.wait()
