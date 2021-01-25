@@ -113,8 +113,7 @@ class LWLink2:
         self._group_ids = []
 
         # Next three variables are used to synchronise responses to requests
-        self._transaction = None
-        self._waitingforresponse = asyncio.Event()
+        self._transactions = {}
         self._response = None
 
         asyncio.ensure_future(self._consumer_handler())
@@ -129,9 +128,10 @@ class LWLink2:
         _LOGGER.debug("Sending: %s", message.json())
         await self._websocket.send_str(message.json())
         _LOGGER.debug("Message sent, waiting for acknowledgement from server")
-        self._transaction = message._message["transactionId"]
-        self._waitingforresponse.clear()
-        await self._waitingforresponse.wait()
+        waitflag = asyncio.Event()
+        self._transactions[message._message["transactionId"]] = waitflag
+        waitflag.clear()
+        await waitflag.wait()
         _LOGGER.debug("Response received: %s", str(self._response))
 
         if self._response:
@@ -159,9 +159,10 @@ class LWLink2:
                             message["operation"] == "write" or message["operation"] == "read"):
                         message["transactionId"] = message["items"][0]["itemId"]
                     # now parse the message
-                    if message["transactionId"] == self._transaction:
-                        self._waitingforresponse.set()
-                        self._transactions = None
+                    if message["transactionId"] in self._transactions:
+                        _LOGGER.debug("Response matched for transaction %s", message["transactionId"])
+                        self._transactions[message["transactionId"]].set()
+                        self._transactions.pop(message["transactionId"])
                         self._response = message
                     elif message["direction"] == "notification" and message["class"] == "group" \
                             and message["operation"] == "event":
@@ -182,8 +183,9 @@ class LWLink2:
                 elif mess.type == aiohttp.WSMsgType.CLOSED:
                     # We're not going to get a response, so clear response flag to allow _send_message to unblock
                     _LOGGER.debug("Websocket closed in message handler")
-                    self._waitingforresponse.set()
-                    self._transactions = None
+                    for key, flag in self._transactions:
+                        flag.set()
+                    self._transactions = {}
                     self._response = None
                     self._websocket = None
                     asyncio.ensure_future(self.async_connect())
