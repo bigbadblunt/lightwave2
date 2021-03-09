@@ -121,9 +121,9 @@ class LWLink2:
     async def _async_sendmessage(self, message, _retry=1):
 
         if not self._websocket or self._websocket.closed:
-            _LOGGER.debug("Can't send (websocket closed), reconnecting")
+            _LOGGER.info("Can't send (websocket closed), reconnecting")
             await self.async_connect()
-            _LOGGER.debug("Connection reopened")
+            _LOGGER.info("Connection reopened")
 
         _LOGGER.debug("Sending: %s", message.json())
         await self._websocket.send_str(message.json())
@@ -137,12 +137,12 @@ class LWLink2:
         if self._response:
             return self._response
         elif _retry >= MAX_RETRIES:
-            _LOGGER.debug("Exceeding MAX_RETRIES, abandoning send")
+            _LOGGER.warning("Exceeding MAX_RETRIES, abandoning send")
             return None
         else:
-            _LOGGER.debug("Send may have failed (websocket closed), reconnecting")
+            _LOGGER.info("Send may have failed (websocket closed), reconnecting")
             await self.async_connect()
-            _LOGGER.debug("Connection reopened, resending message (attempt %s)", _retry + 1)
+            _LOGGER.info("Connection reopened, resending message (attempt %s)", _retry + 1)
             return await self._async_sendmessage(message, _retry + 1)
 
     # Use asyncio.coroutine for compatibility with Python 3.5
@@ -182,13 +182,14 @@ class LWLink2:
                         _LOGGER.warning("Received unhandled message: %s", message)
                 elif mess.type == aiohttp.WSMsgType.CLOSED:
                     # We're not going to get a response, so clear response flag to allow _send_message to unblock
-                    _LOGGER.debug("Websocket closed in message handler")
+                    _LOGGER.info("Websocket closed in message handler")
                     for key, flag in self._transactions:
                         flag.set()
                     self._transactions = {}
                     self._response = None
                     self._websocket = None
                     asyncio.ensure_future(self.async_connect())
+                    _LOGGER.info("Websocket reopened in message handler")
             except AttributeError:  # websocket is None if not set up, just wait for a while
                 yield from asyncio.sleep(1)
 
@@ -391,11 +392,11 @@ class LWLink2:
                 elif response["items"][0]["error"]["code"] == 405:
                     # "Access denied" - bogus token, let's reauthenticate
                     # Lightwave seems to return a string for 200 but an int for 405!
-                    _LOGGER.debug("Authentication token rejected, regenerating and reauthenticating")
+                    _LOGGER.info("Authentication token rejected, regenerating and reauthenticating")
                     self._authtoken = None
                     await self._authenticate_websocket()
                 elif response["items"][0]["error"]["message"] == "user-msgs: Token not valid/expired.":
-                    _LOGGER.debug("Authentication token expired, regenerating and reauthenticating")
+                    _LOGGER.info("Authentication token expired, regenerating and reauthenticating")
                     self._authtoken = None
                     await self._authenticate_websocket()
                 else:
@@ -518,7 +519,7 @@ class LWLink2Public(LWLink2):
             if not(req.status == 401 and (await req.json())['message'] == 'Unauthorized'):
                 return await req.json()
         try:
-            _LOGGER.debug("POST failed due to unauthorized connection, retrying connect")
+            _LOGGER.info("POST failed due to unauthorized connection, retrying connect")
             await self.async_connect()
             async with self._session.post(PUBLIC_API + endpoint,
                                           headers={
