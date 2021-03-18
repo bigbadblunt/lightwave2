@@ -183,7 +183,7 @@ class LWLink2:
                 elif mess.type == aiohttp.WSMsgType.CLOSED:
                     # We're not going to get a response, so clear response flag to allow _send_message to unblock
                     _LOGGER.info("Websocket closed in message handler")
-                    for key, flag in self._transactions:
+                    for key, flag in self._transactions.items():
                         flag.set()
                     self._transactions = {}
                     self._response = None
