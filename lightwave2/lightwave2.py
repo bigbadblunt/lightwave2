@@ -121,28 +121,31 @@ class LWLink2:
     async def _async_sendmessage(self, message, _retry=1):
 
         if not self._websocket or self._websocket.closed:
-            _LOGGER.info("Can't send (websocket closed), reconnecting")
+            _LOGGER.info("async_sendmessage: Websocket closed, reconnecting")
             await self.async_connect()
-            _LOGGER.info("Connection reopened")
+            _LOGGER.info("async_sendmessage: Connection reopened")
 
-        _LOGGER.debug("Sending: %s", message.json())
+        _LOGGER.debug("async_sendmessage: Sending: %s", message.json())
         await self._websocket.send_str(message.json())
-        _LOGGER.debug("Message sent, waiting for acknowledgement from server")
+        _LOGGER.debug("async_sendmessage: Message sent, waiting for acknowledgement from server")
         waitflag = asyncio.Event()
         self._transactions[message._message["transactionId"]] = waitflag
         waitflag.clear()
-        await waitflag.wait()
-        _LOGGER.debug("Response received: %s", str(self._response))
+        try:
+            await asyncio.wait_for(waitflag.wait(), timeout=5.0)
+            _LOGGER.debug("async_sendmessage: Response received: %s", str(self._response))
+        except asyncio.TimeoutError:
+            _LOGGER.debug("async_sendmessage: Timeout waiting for response to : %s", message._message["transactionId"])
+            self._transactions.pop(message._message["transactionId"])
+            self._response = None
 
         if self._response:
             return self._response
         elif _retry >= MAX_RETRIES:
-            _LOGGER.warning("Exceeding MAX_RETRIES, abandoning send")
+            _LOGGER.warning("async_sendmessage: Exceeding MAX_RETRIES, abandoning send")
             return None
         else:
-            _LOGGER.info("Send may have failed (websocket closed), reconnecting")
-            await self.async_connect()
-            _LOGGER.info("Connection reopened, resending message (attempt %s)", _retry + 1)
+            _LOGGER.info("async_sendmessage: Send failed, resending message (attempt %s)", _retry + 1)
             return await self._async_sendmessage(message, _retry + 1)
 
     # Use asyncio.coroutine for compatibility with Python 3.5
@@ -183,11 +186,11 @@ class LWLink2:
                 elif mess.type == aiohttp.WSMsgType.CLOSED:
                     # We're not going to get a response, so clear response flag to allow _send_message to unblock
                     _LOGGER.info("Websocket closed in message handler")
+                    self._response = None
+                    self._websocket = None
                     for key, flag in self._transactions.items():
                         flag.set()
                     self._transactions = {}
-                    self._response = None
-                    self._websocket = None
                     asyncio.ensure_future(self.async_connect())
                     _LOGGER.info("Websocket reopened in message handler")
             except AttributeError:  # websocket is None if not set up, just wait for a while
