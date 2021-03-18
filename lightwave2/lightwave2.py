@@ -154,7 +154,7 @@ class LWLink2:
         while True:
             try:
                 mess = yield from self._websocket.receive()
-                _LOGGER.debug("Received %s", mess)
+                _LOGGER.debug("consumer_handler: Received %s", mess)
                 if mess.type == aiohttp.WSMsgType.TEXT:
                     message = mess.json()
                     # Some transaction IDs don't work, this is a workaround
@@ -163,7 +163,7 @@ class LWLink2:
                         message["transactionId"] = message["items"][0]["itemId"]
                     # now parse the message
                     if message["transactionId"] in self._transactions:
-                        _LOGGER.debug("Response matched for transaction %s", message["transactionId"])
+                        _LOGGER.debug("consumer_handler: Response matched for transaction %s", message["transactionId"])
                         self._transactions[message["transactionId"]].set()
                         self._transactions.pop(message["transactionId"])
                         self._response = message
@@ -176,32 +176,32 @@ class LWLink2:
                             feature = self.get_feature_by_featureid(feature_id)
                             value = message["items"][0]["payload"]["value"]
                             self.get_featureset_by_featureid(feature_id).features[feature][1] = value
-                            _LOGGER.debug("Event received (%s %s %s), calling callbacks %s", feature_id, feature, value, self._callback)
+                            _LOGGER.debug("consumer_handler: Event received (%s %s %s), calling callbacks %s", feature_id, feature, value, self._callback)
                             for func in self._callback:
                                 func()
                         else:
-                            _LOGGER.warning("Unhandled event message: %s", message)
+                            _LOGGER.warning("consumer_handler: Unhandled event message: %s", message)
                     else:
-                        _LOGGER.warning("Received unhandled message: %s", message)
+                        _LOGGER.warning("consumer_handler: Received unhandled message: %s", message)
                 elif mess.type == aiohttp.WSMsgType.CLOSED:
                     # We're not going to get a response, so clear response flag to allow _send_message to unblock
-                    _LOGGER.info("Websocket closed in message handler")
+                    _LOGGER.info("consumer_handler: Websocket closed in message handler")
                     self._response = None
                     self._websocket = None
                     for key, flag in self._transactions.items():
                         flag.set()
                     self._transactions = {}
                     asyncio.ensure_future(self.async_connect())
-                    _LOGGER.info("Websocket reopened in message handler")
+                    _LOGGER.info("consumer_handler: Websocket reopened in message handler")
             except AttributeError:  # websocket is None if not set up, just wait for a while
                 yield from asyncio.sleep(1)
 
     async def async_register_callback(self, callback):
-        _LOGGER.debug("Register callback %s", callback)
+        _LOGGER.debug("async_register_callback: Register callback %s", callback)
         self._callback.append(callback)
 
     async def async_get_hierarchy(self):
-        _LOGGER.debug("Reading hierarchy")
+        _LOGGER.debug("async_get_hierarchy: Reading hierarchy")
         readmess = _LWRFWebsocketMessage("user", "rootGroups")
         readitem = _LWRFWebsocketMessageItem()
         readmess.additem(readitem)
@@ -211,7 +211,7 @@ class LWLink2:
         for item in response["items"]:
             self._group_ids = self._group_ids + item["payload"]["groupIds"]
 
-        _LOGGER.debug("Reading groups {}".format(self._group_ids))
+        _LOGGER.debug("async_get_hierarchy: Reading groups {}".format(self._group_ids))
         await self._async_read_groups()
 
         await self.async_update_featureset_states()
@@ -234,13 +234,13 @@ class LWLink2:
                 for z in x["groups"]:
 
                     if z not in self.featuresets:
-                        _LOGGER.debug("Creating device {}".format(x))
+                        _LOGGER.debug("async_read_groups: Creating device {}".format(x))
                         new_featureset = LWRFFeatureSet()
                         new_featureset.featureset_id = z
                         new_featureset.name = x["name"]
                         self.featuresets[z] = new_featureset
 
-                    _LOGGER.debug("Adding device features {}".format(x))
+                    _LOGGER.debug("async_read_groups: Adding device features {}".format(x))
                     y = self.featuresets[z]
                     y.features[x["attributes"]["type"]] = [x["featureId"], 0] #Something has changed meaning the server doesn't return values on first call
 
@@ -367,16 +367,16 @@ class LWLink2:
         except Exception as exp:
             if (max_tries == 0) or (_retry < max_tries):
                 retry_delay = min(2 ** (_retry + 1), 120)
-                _LOGGER.warning("Cannot connect (exception '{}'). Waiting {} seconds to retry".format(exp, retry_delay))
+                _LOGGER.warning("async_connect: Cannot connect (exception '{}'). Waiting {} seconds to retry".format(exp, retry_delay))
                 await asyncio.sleep(retry_delay)
                 return await self.async_connect(max_tries, _retry + 1)
             else:
-                _LOGGER.warning("Cannot connect, max_tries exceeded, aborting")
+                _LOGGER.warning("async_connect: Cannot connect, max_tries exceeded, aborting")
                 return False
 
     async def _connect_to_server(self):
         if (not self._websocket) or self._websocket.closed:
-            _LOGGER.debug("Connecting to websocket")
+            _LOGGER.debug("connect_to_server: Connecting to websocket")
             self._websocket = await self._session.ws_connect(TRANS_SERVER)
         return await self._authenticate_websocket()
 
@@ -395,15 +395,15 @@ class LWLink2:
                 elif response["items"][0]["error"]["code"] == 405:
                     # "Access denied" - bogus token, let's reauthenticate
                     # Lightwave seems to return a string for 200 but an int for 405!
-                    _LOGGER.info("Authentication token rejected, regenerating and reauthenticating")
+                    _LOGGER.info("authenticate_websocket: Authentication token rejected, regenerating and reauthenticating")
                     self._authtoken = None
                     await self._authenticate_websocket()
                 elif response["items"][0]["error"]["message"] == "user-msgs: Token not valid/expired.":
-                    _LOGGER.info("Authentication token expired, regenerating and reauthenticating")
+                    _LOGGER.info("authenticate_websocket: Authentication token expired, regenerating and reauthenticating")
                     self._authtoken = None
                     await self._authenticate_websocket()
                 else:
-                    _LOGGER.warning("Unhandled authentication error {}".format(response["items"][0]["error"]["message"]))
+                    _LOGGER.warning("authenticate_websocket: Unhandled authentication error {}".format(response["items"][0]["error"]["message"]))
             return response
         else:
             return None
@@ -417,30 +417,30 @@ class LWLink2:
             raise ValueError("auth_method must be 'username' or 'api'")
 
     async def _get_access_token_username(self):
-        _LOGGER.debug("Requesting authentication token (using username and password)")
+        _LOGGER.debug("get_access_token_username: Requesting authentication token (using username and password)")
         authentication = {"email": self._username, "password": self._password, "version": VERSION}
         async with self._session.post(AUTH_SERVER, headers={"x-lwrf-appid": "ios-01"}, json=authentication) as req:
-            _LOGGER.debug("Received response: {}".format(await req.json()))
+            _LOGGER.debug("get_access_token_username: Received response: {}".format(await req.json()))
             if req.status == 200:
                 self._authtoken = (await req.json())["tokens"]["access_token"]
             else:
-                _LOGGER.warning("No authentication token (status_code '{}').".format(req.status))
+                _LOGGER.warning("get_access_token_username: No authentication token (status_code '{}').".format(req.status))
                 raise ConnectionError("No authentication token: {}".format(await req.text))
 
     # TODO check for token expiry
     async def _get_access_token_api(self):
-        _LOGGER.debug("Requesting authentication token (using API key and refresh token)")
+        _LOGGER.debug("get_access_token_api: Requesting authentication token (using API key and refresh token)")
         authentication = {"grant_type": "refresh_token", "refresh_token": self._refresh_token}
         async with self._session.post(PUBLIC_AUTH_SERVER,
                             headers={"authorization": "basic " + self._api_token},
                             json=authentication) as req:
-            _LOGGER.debug("Received response: {}".format(await req.text))
+            _LOGGER.debug("get_access_token_api: Received response: {}".format(await req.text))
             if req.status == 200:
                 self._authtoken = await req.json()["access_token"]
                 self._refresh_token = await req.json()["refresh_token"]
                 self._token_expiry = datetime.datetime.now() + datetime.timedelta(seconds=await req.json()["expires_in"])
             else:
-                _LOGGER.warning("No authentication token (status_code '{}').".format(req.status))
+                _LOGGER.warning("get_access_token_api: No authentication token (status_code '{}').".format(req.status))
                 raise ConnectionError("No authentication token: {}".format(await req.text))
 
     #########################################################
@@ -506,39 +506,39 @@ class LWLink2Public(LWLink2):
 
     # TODO add retries/error checking to public API requests
     async def _async_getrequest(self, endpoint, _retry=1):
-        _LOGGER.debug("Sending API GET request to {}".format(endpoint))
+        _LOGGER.debug("async_getrequest: Sending API GET request to {}".format(endpoint))
         async with self._session.get(PUBLIC_API + endpoint,
                                      headers= {"authorization": "bearer " + self._authtoken}
                                       ) as req:
-            _LOGGER.debug("Received API response {} {} {}".format(req.status, await req.text(), await req.json()))
+            _LOGGER.debug("async_getrequest: Received API response {} {} {}".format(req.status, await req.text(), await req.json()))
             return await req.json()
 
     async def _async_postrequest(self, endpoint, body="", _retry=1):
-        _LOGGER.debug("Sending API POST request to {}: {}".format(endpoint, body))
+        _LOGGER.debug("async_postrequest: Sending API POST request to {}: {}".format(endpoint, body))
         async with self._session.post(PUBLIC_API + endpoint,
                                       headers= {"authorization": "bearer " + self._authtoken},
                                       json=body) as req:
-            _LOGGER.debug("Received API response {} {} {}".format(req.status, await req.text(), await req.json()))
+            _LOGGER.debug("async_postrequest: Received API response {} {} {}".format(req.status, await req.text(), await req.json()))
             if not(req.status == 401 and (await req.json())['message'] == 'Unauthorized'):
                 return await req.json()
         try:
-            _LOGGER.info("POST failed due to unauthorized connection, retrying connect")
+            _LOGGER.info("async_postrequest: POST failed due to unauthorized connection, retrying connect")
             await self.async_connect()
             async with self._session.post(PUBLIC_API + endpoint,
                                           headers={
                                               "authorization": "bearer " + self._authtoken},
                                           json=body) as req:
-                _LOGGER.debug("Received API response {} {} {}".format(req.status, await req.text(), await req.json()))
+                _LOGGER.debug("async_postrequest: Received API response {} {} {}".format(req.status, await req.text(), await req.json()))
                 return await req.json()
         except:
             return False
 
     async def _async_deleterequest(self, endpoint, _retry=1):
-        _LOGGER.debug("Sending API DELETE request to {}".format(endpoint))
+        _LOGGER.debug("async_deleterequest: Sending API DELETE request to {}".format(endpoint))
         async with self._session.delete(PUBLIC_API + endpoint,
                                      headers= {"authorization": "bearer " + self._authtoken}
                                       ) as req:
-            _LOGGER.debug("Received API response {} {} {}".format(req.status, await req.text(), await req.json()))
+            _LOGGER.debug("async_deleterequest: Received API response {} {} {}".format(req.status, await req.text(), await req.json()))
             return await req.json()
 
     async def async_get_hierarchy(self):
@@ -550,14 +550,14 @@ class LWLink2Public(LWLink2):
 
             for x in response["devices"]:
                 for y in x["featureSets"]:
-                    _LOGGER.debug("Creating device {}".format(x))
+                    _LOGGER.debug("async_get_hierarchy: Creating device {}".format(x))
                     new_featureset = LWRFFeatureSet()
                     new_featureset.featureset_id = y["featureSetId"]
                     new_featureset.product_code = x["productCode"]
                     new_featureset.name = x["name"]
 
                     for z in y["features"]:
-                        _LOGGER.debug("Adding device features {}".format(z))
+                        _LOGGER.debug("async_get_hierarchy: Adding device features {}".format(z))
                         new_featureset.features[z["type"]] = [z["featureId"], None]
 
                     self.featuresets[y["featureSetId"]] = new_featureset
