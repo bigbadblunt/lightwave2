@@ -152,7 +152,7 @@ class LWLink2:
     @asyncio.coroutine
     def _consumer_handler(self):
         while True:
-            _LOGGER.debug("consumer_handler: starting consumer handler")
+            _LOGGER.debug("consumer_handler: Starting consumer handler")
             try:
                 mess = yield from self._websocket.receive()
                 _LOGGER.debug("consumer_handler: Received %s", mess)
@@ -192,10 +192,11 @@ class LWLink2:
                     for key, flag in self._transactions.items():
                         flag.set()
                     self._transactions = {}
+                    self._authtoken = None
                     asyncio.ensure_future(self.async_connect())
-                    _LOGGER.info("consumer_handler: Websocket reopened in message handler")
+                    _LOGGER.info("consumer_handler: Websocket reconnect requested by message handler")
             except AttributeError:  # websocket is None if not set up, just wait for a while
-                _LOGGER.debug("consumer_handler: attribute error, sleeping for 1 sec")
+                _LOGGER.debug("consumer_handler: websocket not ready, sleeping for 1 sec")
                 yield from asyncio.sleep(1)
             except Exception as exp:
                 _LOGGER.warning("consumer_handler: unhandled exception ('{}')".format(exp))
