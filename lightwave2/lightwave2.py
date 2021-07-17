@@ -14,7 +14,7 @@ VERSION = "1.6.8"
 MAX_RETRIES = 5
 PUBLIC_AUTH_SERVER = "https://auth.lightwaverf.com/token"
 PUBLIC_API = "https://publicapi.lightwaverf.com/v1/"
-RGB_FLOOR = int("0x1B", 16) #Lightwave app seems to floor RGB values here, let's do the same
+RGB_FLOOR = int("0x0", 16) #Previously the Lightwave app floored RGB values, but it doesn't any more
 
 #TODO adapt async_connect calls to respond to connection failure
 
