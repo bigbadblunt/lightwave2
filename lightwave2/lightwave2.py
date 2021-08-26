@@ -112,7 +112,7 @@ class LWLink2:
         self._callback = []
         self._group_ids = []
 
-        # Next three variables are used to synchronise responses to requests
+        # Next two variables are used to synchronise responses to requests
         self._transactions = {}
         self._response = None
 
@@ -176,10 +176,12 @@ class LWLink2:
                             feature_id = message["items"][0]["payload"]["featureId"]
                             feature = self.get_feature_by_featureid(feature_id)
                             value = message["items"][0]["payload"]["value"]
+                            prev_value = self.get_featureset_by_featureid(feature_id).features[feature][1]
                             self.get_featureset_by_featureid(feature_id).features[feature][1] = value
-                            _LOGGER.debug("consumer_handler: Event received (%s %s %s), calling callbacks %s", feature_id, feature, value, self._callback)
+                            cblist = [c.__name__ for c in self._callback]
+                            _LOGGER.debug("consumer_handler: Event received (%s %s %s), calling callbacks %s", feature_id, feature, value, cblist)
                             for func in self._callback:
-                                func()
+                                func(feature=feature, feature_id=feature_id, prev_value = prev_value, new_value = value)
                         else:
                             _LOGGER.warning("consumer_handler: Unhandled event message: %s", message)
                     else:
@@ -202,7 +204,7 @@ class LWLink2:
                 _LOGGER.warning("consumer_handler: unhandled exception ('{}')".format(exp))
 
     async def async_register_callback(self, callback):
-        _LOGGER.debug("async_register_callback: Register callback %s", callback)
+        _LOGGER.debug("async_register_callback: Register callback '%s'", callback.__name__)
         self._callback.append(callback)
 
     async def async_get_hierarchy(self):
@@ -372,7 +374,7 @@ class LWLink2:
         except Exception as exp:
             if (max_tries == 0) or (_retry < max_tries):
                 retry_delay = min(2 ** (_retry + 1), 120)
-                _LOGGER.warning("async_connect: Cannot connect (exception '{}'). Waiting {} seconds to retry".format(exp, retry_delay))
+                _LOGGER.warning("async_connect: Cannot connect (exception '{}'). Waiting {} seconds to retry".format(repr(exp), retry_delay))
                 await asyncio.sleep(retry_delay)
                 return await self.async_connect(max_tries, _retry + 1)
             else:
@@ -425,12 +427,10 @@ class LWLink2:
         _LOGGER.debug("get_access_token_username: Requesting authentication token (using username and password)")
         authentication = {"email": self._username, "password": self._password, "version": VERSION}
         async with self._session.post(AUTH_SERVER, headers={"x-lwrf-appid": "ios-01"}, json=authentication) as req:
-            _LOGGER.debug("get_access_token_username: Received response: {}".format(await req.json()))
             if req.status == 200:
+                _LOGGER.debug("get_access_token_username: Received response: {}".format(await req.json()))
                 self._authtoken = (await req.json())["tokens"]["access_token"]
-            else:
-                _LOGGER.warning("get_access_token_username: No authentication token (status_code '{}').".format(req.status))
-                raise ConnectionError("No authentication token: {}".format(await req.text))
+
 
     # TODO check for token expiry
     async def _get_access_token_api(self):
@@ -446,7 +446,7 @@ class LWLink2:
                 self._token_expiry = datetime.datetime.now() + datetime.timedelta(seconds=await req.json()["expires_in"])
             else:
                 _LOGGER.warning("get_access_token_api: No authentication token (status_code '{}').".format(req.status))
-                raise ConnectionError("No authentication token: {}".format(await req.text))
+                raise ConnectionError("No authentication token: {}".format(await req.text()))
 
     #########################################################
     # Convenience methods for non-async calls
