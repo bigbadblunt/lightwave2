@@ -574,7 +574,7 @@ class LWLink2Public(LWLink2):
 
     async def async_register_webhook(self, url, feature_id, ref, overwrite = False):
         if overwrite:
-            req = await self._async_deleterequest("events/" + ref)
+            req = await self._async_deleterequest("eventsas/" + ref)
         payload = {"events": [{"type": "feature", "id": feature_id}],
                     "url": url,
                     "ref": ref}

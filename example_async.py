@@ -1,4 +1,4 @@
-import lightwave2
+from lightwave2 import lightwave2
 import logging
 import asyncio
 
