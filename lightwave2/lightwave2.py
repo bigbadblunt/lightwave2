@@ -520,7 +520,8 @@ class LWLink2Public(LWLink2):
         async with self._session.get(PUBLIC_API + endpoint,
                                      headers= {"authorization": "bearer " + self._authtoken}
                                       ) as req:
-            _LOGGER.debug("async_getrequest: Received API response {} {} {}".format(req.status, await req.text(), await req.json(content_type=None)))
+            _LOGGER.debug("async_getrequest: Received API response {} {} {} {}".format(req.status, req.raw_headers, await req.text(), await req.json(content_type=None)))
+            #TODO if (req.status == 429) #Rate limited
             return await req.json()
 
     async def _async_postrequest(self, endpoint, body="", _retry=1):
@@ -528,7 +529,7 @@ class LWLink2Public(LWLink2):
         async with self._session.post(PUBLIC_API + endpoint,
                                       headers= {"authorization": "bearer " + self._authtoken},
                                       json=body) as req:
-            _LOGGER.debug("async_postrequest: Received API response {} {} {}".format(req.status, await req.text(), await req.json(content_type=None)))
+            _LOGGER.debug("async_postrequest: Received API response {} {} {} {}".format(req.status, req.raw_headers, await req.text(), await req.json(content_type=None)))
             if not(req.status == 401 and (await req.json())['message'] == 'Unauthorized'):
                 return await req.json()
         try:
@@ -548,7 +549,7 @@ class LWLink2Public(LWLink2):
         async with self._session.delete(PUBLIC_API + endpoint,
                                      headers= {"authorization": "bearer " + self._authtoken}
                                       ) as req:
-            _LOGGER.debug("async_deleterequest: Received API response {} {} {}".format(req.status, await req.text(), await req.json(content_type=None)))
+            _LOGGER.debug("async_deleterequest: Received API response {} {} {} {}".format(req.status, req.raw_headers, await req.text(), await req.json(content_type=None)))
             return await req.json()
 
     async def async_get_hierarchy(self):
