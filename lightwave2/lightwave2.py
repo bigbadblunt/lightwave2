@@ -524,7 +524,7 @@ class LWLink2Public(LWLink2):
             if (req.status == 429): #Rate limited
                 _LOGGER.debug("async_getrequest: rate limited, wait and retry")
                 await asyncio.sleep(1)
-                await self._async_getrequest(self, endpoint, _retry)
+                await self._async_getrequest(endpoint, _retry)
 
             return await req.json()
 
@@ -537,7 +537,7 @@ class LWLink2Public(LWLink2):
             if (req.status == 429): #Rate limited
                 _LOGGER.debug("async_postrequest: rate limited, wait and retry")
                 await asyncio.sleep(1)
-                await self._async_postrequest(self, endpoint, body, _retry)
+                await self._async_postrequest(endpoint, body, _retry)
             if not(req.status == 401 and (await req.json())['message'] == 'Unauthorized'):
                 return await req.json()
         try:
@@ -561,7 +561,7 @@ class LWLink2Public(LWLink2):
             if (req.status == 429): #Rate limited
                 _LOGGER.debug("async_deleterequest: rate limited, wait and retry")
                 await asyncio.sleep(1)
-                await self._async_deleterequest(self, endpoint, _retry)
+                await self._async_deleterequest(endpoint, _retry)
             return await req.json()
 
     async def async_get_hierarchy(self):
