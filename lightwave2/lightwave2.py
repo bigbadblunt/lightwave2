@@ -83,6 +83,7 @@ class LWRFFeatureSet:
 
     def is_gen2(self):
         return 'identify' in self.features.keys()
+        #this no longer appears to be reliable, but not changing
 
     def reports_power(self):
         return 'power' in self.features.keys()
