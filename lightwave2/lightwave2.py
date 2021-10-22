@@ -431,7 +431,7 @@ class LWLink2:
         authentication = {"email": self._username, "password": self._password, "version": VERSION}
         async with self._session.post(AUTH_SERVER, headers={"x-lwrf-appid": "ios-01"}, json=authentication) as req:
             if req.status == 200:
-                _LOGGER.debug("get_access_token_username: Received response (detail not shown for security)")
+                _LOGGER.debug("get_access_token_username: Received response: [contents hidden for security]")
                 #_LOGGER.debug("get_access_token_username: Received response: {}".format(await req.json()))
                 self._authtoken = (await req.json())["tokens"]["access_token"]
 
@@ -443,7 +443,8 @@ class LWLink2:
         async with self._session.post(PUBLIC_AUTH_SERVER,
                             headers={"authorization": "basic " + self._api_token},
                             json=authentication) as req:
-            _LOGGER.debug("get_access_token_api: Received response: {}".format(await req.text()))
+            _LOGGER.debug("get_access_token_api: Received response: [contents hidden for security]")
+            #_LOGGER.debug("get_access_token_api: Received response: {}".format(await req.text()))
             if req.status == 200:
                 self._authtoken = (await req.json())["access_token"]
                 self._refresh_token = (await req.json())["refresh_token"]
