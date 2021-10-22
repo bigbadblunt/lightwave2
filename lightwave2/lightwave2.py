@@ -55,43 +55,20 @@ class LWRFFeatureSet:
         self.product_code = None
         self.features = {}
 
-    def has_feature(self, feature):
-        return feature in self.features.keys()
+    def has_feature(self, feature): return feature in self.features.keys()
 
-    def is_switch(self):
-        return ('switch' in self.features.keys()) and not ('dimLevel' in self.features.keys())
-
-    def is_light(self):
-        return 'dimLevel' in self.features.keys()
-
+    def is_switch(self): return (self.has_feature('switch')) and not (self.has_feature('dimLevel'))
+    def is_light(self): return self.has_feature('dimLevel')
     def is_climate(self): return self.has_feature('targetTemperature')
+    def is_trv(self): return self.has_feature('valveSetup')
+    def is_cover(self): return self.has_feature('threeWayRelay')
+    def is_energy(self): return (self.has_feature('energy')) and (self.has_feature('rssi'))
+    def is_windowsensor(self): return self.has_feature('windowPosition')
+    def is_hub(self): return self.has_feature('buttonPress')
 
-    def is_trv(self):
-        return 'valveSetup' in self.features.keys()
-
-    def is_cover(self):
-        return 'threeWayRelay' in self.features.keys()
-
-    def is_energy(self):
-        return ('energy' in self.features.keys()) and ('rssi' in self.features.keys())
-
-    def is_windowsensor(self):
-        return 'windowPosition' in self.features.keys()
-
-    def is_hub(self):
-        return 'buttonPress' in self.features.keys()
-
-    def is_gen2(self):
-        return 'identify' in self.features.keys()
-        #this no longer appears to be reliable, but not changing
-
-    def reports_power(self):
-        return 'power' in self.features.keys()
-
-    def has_led(self):
-        return 'rgbColor' in self.features.keys()
-
-
+    def is_gen2(self): return self.has_feature('upgrade')
+    def reports_power(self): return self.has_feature('power')
+    def has_led(self): return self.has_feature('rgbColor')
 
 class LWLink2:
 
