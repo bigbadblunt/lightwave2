@@ -521,7 +521,11 @@ class LWLink2Public(LWLink2):
                                      headers= {"authorization": "bearer " + self._authtoken}
                                       ) as req:
             _LOGGER.debug("async_getrequest: Received API response {} {} {} {}".format(req.status, req.raw_headers, await req.text(), await req.json(content_type=None)))
-            #TODO if (req.status == 429) #Rate limited
+            if (req.status == 429): #Rate limited
+                _LOGGER.debug("async_getrequest: rate limited, wait and retry")
+                await asyncio.sleep(1)
+                await self._async_getrequest(self, endpoint, _retry)
+
             return await req.json()
 
     async def _async_postrequest(self, endpoint, body="", _retry=1):
@@ -530,6 +534,10 @@ class LWLink2Public(LWLink2):
                                       headers= {"authorization": "bearer " + self._authtoken},
                                       json=body) as req:
             _LOGGER.debug("async_postrequest: Received API response {} {} {} {}".format(req.status, req.raw_headers, await req.text(), await req.json(content_type=None)))
+            if (req.status == 429): #Rate limited
+                _LOGGER.debug("async_postrequest: rate limited, wait and retry")
+                await asyncio.sleep(1)
+                await self._async_postrequest(self, endpoint, body, _retry)
             if not(req.status == 401 and (await req.json())['message'] == 'Unauthorized'):
                 return await req.json()
         try:
@@ -550,6 +558,10 @@ class LWLink2Public(LWLink2):
                                      headers= {"authorization": "bearer " + self._authtoken}
                                       ) as req:
             _LOGGER.debug("async_deleterequest: Received API response {} {} {} {}".format(req.status, req.raw_headers, await req.text(), await req.json(content_type=None)))
+            if (req.status == 429): #Rate limited
+                _LOGGER.debug("async_deleterequest: rate limited, wait and retry")
+                await asyncio.sleep(1)
+                await self._async_deleterequest(self, endpoint, _retry)
             return await req.json()
 
     async def async_get_hierarchy(self):
