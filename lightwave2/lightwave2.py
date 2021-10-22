@@ -55,14 +55,16 @@ class LWRFFeatureSet:
         self.product_code = None
         self.features = {}
 
+    def has_feature(self, feature):
+        return feature in self.features.keys()
+
     def is_switch(self):
         return ('switch' in self.features.keys()) and not ('dimLevel' in self.features.keys())
 
     def is_light(self):
         return 'dimLevel' in self.features.keys()
 
-    def is_climate(self):
-        return 'targetTemperature' in self.features.keys()
+    def is_climate(self): return self.has_feature('targetTemperature')
 
     def is_trv(self):
         return 'valveSetup' in self.features.keys()
@@ -87,6 +89,7 @@ class LWRFFeatureSet:
 
     def has_led(self):
         return 'rgbColor' in self.features.keys()
+
 
 
 class LWLink2:
