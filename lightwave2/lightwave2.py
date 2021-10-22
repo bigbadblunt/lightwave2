@@ -118,14 +118,17 @@ class LWLink2:
 
         asyncio.ensure_future(self._consumer_handler())
 
-    async def _async_sendmessage(self, message, _retry=1):
+    async def _async_sendmessage(self, message, _retry=1, redact = False):
 
         if not self._websocket or self._websocket.closed:
             _LOGGER.info("async_sendmessage: Websocket closed, reconnecting")
             await self.async_connect()
             _LOGGER.info("async_sendmessage: Connection reopened")
 
-        _LOGGER.debug("async_sendmessage: Sending: %s", message.json())
+        if redact:
+            _LOGGER.debug("async_sendmessage: [contents hidden for security]")
+        else:
+            _LOGGER.debug("async_sendmessage: Sending: %s", message.json())
         await self._websocket.send_str(message.json())
         _LOGGER.debug("async_sendmessage: Message sent, waiting for acknowledgement from server")
         waitflag = asyncio.Event()
@@ -146,7 +149,7 @@ class LWLink2:
             return None
         else:
             _LOGGER.info("async_sendmessage: Send failed, resending message (attempt %s)", _retry + 1)
-            return await self._async_sendmessage(message, _retry + 1)
+            return await self._async_sendmessage(message, _retry + 1, redact)
 
     # Use asyncio.coroutine for compatibility with Python 3.5
     @asyncio.coroutine
@@ -394,7 +397,7 @@ class LWLink2:
             authmess = _LWRFWebsocketMessage("user", "authenticate")
             authpayload = _LWRFWebsocketMessageItem({"token": self._authtoken, "clientDeviceId": self._device_id})
             authmess.additem(authpayload)
-            response = await self._async_sendmessage(authmess)
+            response = await self._async_sendmessage(authmess, redact = True)
             if not response["items"][0]["success"]:
                 if response["items"][0]["error"]["code"] == "200":
                     # "Channel is already authenticated" - Do nothing
@@ -428,7 +431,8 @@ class LWLink2:
         authentication = {"email": self._username, "password": self._password, "version": VERSION}
         async with self._session.post(AUTH_SERVER, headers={"x-lwrf-appid": "ios-01"}, json=authentication) as req:
             if req.status == 200:
-                _LOGGER.debug("get_access_token_username: Received response: {}".format(await req.json()))
+                _LOGGER.debug("get_access_token_username: Received response (detail not shown for security)")
+                #_LOGGER.debug("get_access_token_username: Received response: {}".format(await req.json()))
                 self._authtoken = (await req.json())["tokens"]["access_token"]
 
 
