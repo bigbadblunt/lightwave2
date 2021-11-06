@@ -35,7 +35,6 @@ class _LWRFWebsocketMessage:
     def json(self):
         return json.dumps(self._message)
 
-
 class _LWRFWebsocketMessageItem:
     _item_id = 0
 
@@ -250,6 +249,9 @@ class LWLink2:
         readmess.additem(readitem)
         await self._async_sendmessage(readmess)
 
+    async def async_write_feature_by_name(self, featureset_id, featurename, value):
+        await self.async_write_feature(self.featuresets[featureset_id].features[featurename][0], value)
+
     async def async_read_feature(self, feature_id):
         readmess = _LWRFWebsocketMessage("feature", "read")
         readitem = _LWRFWebsocketMessageItem({"featureId": feature_id})
@@ -273,44 +275,28 @@ class LWLink2:
                     return z
 
     async def async_turn_on_by_featureset_id(self, featureset_id):
-        y = self.get_featureset_by_id(featureset_id)
-        feature_id = y.features["switch"][0]
-        await self.async_write_feature(feature_id, 1)
+        await self.async_write_feature_by_name(featureset_id, "switch", 1)
 
     async def async_turn_off_by_featureset_id(self, featureset_id):
-        y = self.get_featureset_by_id(featureset_id)
-        feature_id = y.features["switch"][0]
-        await self.async_write_feature(feature_id, 0)
+        await self.async_write_feature_by_name(featureset_id, "switch", 0)
 
     async def async_set_brightness_by_featureset_id(self, featureset_id, level):
-        y = self.get_featureset_by_id(featureset_id)
-        feature_id = y.features["dimLevel"][0]
-        await self.async_write_feature(feature_id, level)
+        await self.async_write_feature_by_name(featureset_id, "dimLevel", level)
 
     async def async_set_temperature_by_featureset_id(self, featureset_id, level):
-        y = self.get_featureset_by_id(featureset_id)
-        feature_id = y.features["targetTemperature"][0]
-        await self.async_write_feature(feature_id, int(level * 10))
+        await self.async_write_feature_by_name(featureset_id, "targetTemperature", int(level * 10))
 
     async def async_set_valvelevel_by_featureset_id(self, featureset_id, level):
-        y = self.get_featureset_by_id(featureset_id)
-        feature_id = y.features["valveLevel"][0]
-        await self.async_write_feature(feature_id, int(level * 20))
+        await self.async_write_feature_by_name(featureset_id, "valveLevel", int(level * 20))
 
     async def async_cover_open_by_featureset_id(self, featureset_id):
-        y = self.get_featureset_by_id(featureset_id)
-        feature_id = y.features["threeWayRelay"][0]
-        await self.async_write_feature(feature_id, 1)
+        await self.async_write_feature_by_name(featureset_id, "threeWayRelay", 1)
 
     async def async_cover_close_by_featureset_id(self, featureset_id):
-        y = self.get_featureset_by_id(featureset_id)
-        feature_id = y.features["threeWayRelay"][0]
-        await self.async_write_feature(feature_id, 2)
+        await self.async_write_feature_by_name(featureset_id, "threeWayRelay", 2)
 
     async def async_cover_stop_by_featureset_id(self, featureset_id):
-        y = self.get_featureset_by_id(featureset_id)
-        feature_id = y.features["threeWayRelay"][0]
-        await self.async_write_feature(feature_id, 0)
+        await self.async_write_feature_by_name(featureset_id, "threeWayRelay", 0)
 
     async def async_set_led_rgb_by_featureset_id(self, featureset_id, color):
         red = (color & int("0xFF0000", 16)) >> 16
@@ -323,9 +309,7 @@ class LWLink2:
         if blue != 0:
             blue = min(max(blue , RGB_FLOOR), 255)
         newcolor = (red << 16) + (green << 8) + blue
-        y = self.get_featureset_by_id(featureset_id)
-        feature_id = y.features["rgbColor"][0]
-        await self.async_write_feature(feature_id, newcolor)
+        await self.async_write_feature_by_name(featureset_id, "rgbColor", newcolor)
 
     def get_switches(self):
         return [(x.featureset_id, x.name) for x in self.featuresets.values() if x.is_switch()]
