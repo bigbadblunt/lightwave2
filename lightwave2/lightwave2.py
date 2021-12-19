@@ -398,7 +398,6 @@ class LWLink2:
         _LOGGER.debug("get_access_token_username: Requesting authentication token (using username and password)")
         authentication = {"email": self._username, "password": self._password, "version": VERSION}
         async with self._session.post(AUTH_SERVER, headers={"x-lwrf-appid": "ios-01"}, json=authentication) as req:
-            _LOGGER.debug("get_access_token_username: Received response: status {}, type {}, content {}".format(req.status, req.content_type, await req.text()))
             if req.status == 200:
                 _LOGGER.debug("get_access_token_username: Received response: [contents hidden for security]")
                 #_LOGGER.debug("get_access_token_username: Received response: {}".format(await req.json()))
@@ -407,7 +406,7 @@ class LWLink2:
                 _LOGGER.warning("get_access_token_username: Authentication failed - if network is ok, possible wrong username/password")
                 self._authtoken = None
             else:
-                _LOGGER.debug("get_access_token_username: Received response: status {}".format(req.status))
+                _LOGGER.warning("get_access_token_username: Authentication failed, : status {}".format(req.status))
                 self._authtoken = None
 
     # TODO check for token expiry
