@@ -241,7 +241,10 @@ class LWLink2:
         for dummy, x in self.featuresets.items():
             for y in x.features:
                 value = await self.async_read_feature(x.features[y][0])
-                x.features[y][1] = value["items"][0]["payload"]["value"]
+                if value["items"][0]["success"] == True:
+                    x.features[y][1] = value["items"][0]["payload"]["value"]
+                else:
+                    _LOGGER.warning("update_featureset_states: failed to read feature ({}), returned {}".format(x.features[y][0], value))
 
     async def async_write_feature(self, feature_id, value):
         readmess = _LWRFWebsocketMessage("feature", "write")
@@ -337,9 +340,9 @@ class LWLink2:
     #########################################################
 
     async def async_connect(self, max_tries=5, _retry=0):
-        #try:
+        try:
             return await self._connect_to_server()
-        #except Exception as exp:
+        except Exception as exp:
             if (max_tries == 0) or (_retry < max_tries):
                 retry_delay = min(2 ** (_retry + 1), 120)
                 _LOGGER.warning("async_connect: Cannot connect (exception '{}'). Waiting {} seconds to retry".format(repr(exp), retry_delay))
@@ -395,11 +398,17 @@ class LWLink2:
         _LOGGER.debug("get_access_token_username: Requesting authentication token (using username and password)")
         authentication = {"email": self._username, "password": self._password, "version": VERSION}
         async with self._session.post(AUTH_SERVER, headers={"x-lwrf-appid": "ios-01"}, json=authentication) as req:
-            _LOGGER.debug("get_access_token_username: Received response: status {}".format(req.status))
+            _LOGGER.debug("get_access_token_username: Received response: status {}, type {}, content {}".format(req.status, req.content_type, await req.text()))
             if req.status == 200:
                 _LOGGER.debug("get_access_token_username: Received response: [contents hidden for security]")
                 #_LOGGER.debug("get_access_token_username: Received response: {}".format(await req.json()))
                 self._authtoken = (await req.json())["tokens"]["access_token"]
+            elif req.status == 404:
+                _LOGGER.warning("get_access_token_username: Authentication failed - if network is ok, possible wrong username/password")
+                self._authtoken = None
+            else:
+                _LOGGER.debug("get_access_token_username: Received response: status {}".format(req.status))
+                self._authtoken = None
 
     # TODO check for token expiry
     async def _get_access_token_api(self):
