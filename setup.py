@@ -9,6 +9,9 @@ setuptools.setup(
     author="Bryan Blunt",
     author_email="bryan@blunt.me.uk",
     description="Controls for Lightwave RF second generation devices",
+    install_requires=[
+        "aiohttp<=4",
+    ],
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/bigbadblunt/lightwave2",
