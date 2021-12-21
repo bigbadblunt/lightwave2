@@ -461,6 +461,9 @@ class LWLink2:
     def write_feature(self, feature_id, value):
         return asyncio.get_event_loop().run_until_complete(self.async_write_feature(feature_id, value))
 
+    def write_feature_by_name(self, featureset_id, featurename, value):
+        return asyncio.get_event_loop().run_until_complete(self.async_write_feature_by_name(self, featureset_id, featurename, value))
+
     def read_feature(self, feature_id):
         return asyncio.get_event_loop().run_until_complete(self.async_read_feature(feature_id))
 
