@@ -155,6 +155,12 @@ class LWLink2:
             try:
                 mess = await self._websocket.receive()
                 _LOGGER.debug("consumer_handler: Received %s", mess)
+            except AttributeError:  # websocket is None if not set up, just wait for a while
+                _LOGGER.debug("consumer_handler: websocket not ready, sleeping for 1 sec")
+                await asyncio.sleep(1)
+            except Exception as exp:
+                _LOGGER.warning("consumer_handler: unhandled exception ('{}')".format(exp))
+            else:
                 if mess.type == aiohttp.WSMsgType.TEXT:
                     message = mess.json()
                     # Some transaction IDs don't work, this is a workaround
@@ -196,11 +202,6 @@ class LWLink2:
                     self._authtoken = None
                     asyncio.ensure_future(self.async_connect())
                     _LOGGER.info("consumer_handler: Websocket reconnect requested by message handler")
-            except AttributeError:  # websocket is None if not set up, just wait for a while
-                _LOGGER.debug("consumer_handler: websocket not ready, sleeping for 1 sec")
-                await asyncio.sleep(1)
-            except Exception as exp:
-                _LOGGER.warning("consumer_handler: unhandled exception ('{}')".format(exp))
 
     async def async_register_callback(self, callback):
         _LOGGER.debug("async_register_callback: Register callback '%s'", callback.__name__)
@@ -290,7 +291,7 @@ class LWLink2:
         return None
 
     def get_feature_by_featureid(self, feature_id):
-        for x in self.featuresets.Values():
+        for x in self.featuresets.values():
             for y in x.features.values():
                 if y.id == feature_id:
                     return y
