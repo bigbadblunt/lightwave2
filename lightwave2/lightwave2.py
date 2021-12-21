@@ -69,6 +69,12 @@ class LWRFFeatureSet:
     def reports_power(self): return self.has_feature('power')
     def has_led(self): return self.has_feature('rgbColor')
 
+class LWRFFeature:
+
+    def __init__(self):
+        self.id = None
+        self.name = None
+
 class LWLink2:
 
     def __init__(self, username=None, password=None, auth_method="username", api_token=None, refresh_token=None):
@@ -109,6 +115,7 @@ class LWLink2:
             _LOGGER.debug("async_sendmessage: [contents hidden for security]")
         else:
             _LOGGER.debug("async_sendmessage: Sending: %s", message.json())
+
         await self._websocket.send_str(message.json())
         _LOGGER.debug("async_sendmessage: Message sent, waiting for acknowledgement from server")
         waitflag = asyncio.Event()
@@ -131,13 +138,11 @@ class LWLink2:
             _LOGGER.info("async_sendmessage: Send failed, resending message (attempt %s)", _retry + 1)
             return await self._async_sendmessage(message, _retry + 1, redact)
 
-    # Use asyncio.coroutine for compatibility with Python 3.5
-    @asyncio.coroutine
-    def _consumer_handler(self):
+    async def _consumer_handler(self):
         while True:
             _LOGGER.debug("consumer_handler: Starting consumer handler")
             try:
-                mess = yield from self._websocket.receive()
+                mess = await self._websocket.receive()
                 _LOGGER.debug("consumer_handler: Received %s", mess)
                 if mess.type == aiohttp.WSMsgType.TEXT:
                     message = mess.json()
@@ -148,12 +153,12 @@ class LWLink2:
                     # now parse the message
                     if message["transactionId"] in self._transactions:
                         _LOGGER.debug("consumer_handler: Response matched for transaction %s", message["transactionId"])
+                        self._response = message
                         self._transactions[message["transactionId"]].set()
                         self._transactions.pop(message["transactionId"])
-                        self._response = message
                     elif message["direction"] == "notification" and message["class"] == "group" \
                             and message["operation"] == "event":
-                        yield from self.async_get_hierarchy()
+                        await self.async_get_hierarchy()
                     elif message["direction"] == "notification" and message["operation"] == "event":
                         if "featureId" in message["items"][0]["payload"]:
                             feature_id = message["items"][0]["payload"]["featureId"]
