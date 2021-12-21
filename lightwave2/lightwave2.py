@@ -75,6 +75,7 @@ class LWRFFeature:
     def __init__(self):
         self.featureset = None
         self.id = None
+        self.name = None
         self._state = None
         
     @property
@@ -174,12 +175,12 @@ class LWLink2:
                             feature_id = message["items"][0]["payload"]["featureId"]
                             feature = self.get_feature_by_featureid(feature_id)
                             value = message["items"][0]["payload"]["value"]
-                            prev_value = self.get_featureset_by_featureid(feature_id).features[feature][1]
-                            self.get_featureset_by_featureid(feature_id).features[feature][1] = value
+                            prev_value = feature.state
+                            feature.state = value
                             cblist = [c.__name__ for c in self._callback]
                             _LOGGER.debug("consumer_handler: Event received (%s %s %s), calling callbacks %s", feature_id, feature, value, cblist)
                             for func in self._callback:
-                                func(feature=feature, feature_id=feature_id, prev_value = prev_value, new_value = value)
+                                func(feature=feature.name, feature_id=feature.id, prev_value = prev_value, new_value = value)
                         else:
                             _LOGGER.warning("consumer_handler: Unhandled event message: %s", message)
                     else:
@@ -247,17 +248,21 @@ class LWLink2:
 
                     _LOGGER.debug("async_read_groups: Adding device features {}".format(x))
                     y = self.featuresets[z]
-                    y.features[x["attributes"]["type"]] = [x["featureId"], 0] #Something has changed meaning the server doesn't return values on first call
+                    feature = LWRFFeature()
+                    feature.featureset = y
+                    feature.name = x["attributes"]["type"]
+                    feature.id = x["featureId"]
+                    y.features[feature.name] = feature 
 
             for x in list(response["items"][0]["payload"]["devices"].values()):
                 self.get_featureset_by_featureid(x['featureIds'][0]).product_code = x['productCode']
 
     async def async_update_featureset_states(self):
-        for dummy, x in self.featuresets.items():
-            for y in x.features:
-                value = await self.async_read_feature(x.features[y][0])
+        for x in self.featuresets.values():
+            for y in x.features.values():
+                value = await self.async_read_feature(y.name)
                 if value["items"][0]["success"] == True:
-                    x.features[y][1] = value["items"][0]["payload"]["value"]
+                    y._state = value["items"][0]["payload"]["value"]
                 else:
                     _LOGGER.warning("update_featureset_states: failed to read feature ({}), returned {}".format(x.features[y][0], value))
 
@@ -276,21 +281,19 @@ class LWLink2:
         readmess.additem(readitem)
         return await self._async_sendmessage(readmess)
 
-    def get_featureset_by_id(self, featureset_id):
-        return self.featuresets[featureset_id]
-
     def get_featureset_by_featureid(self, feature_id):
-        for dummy, x in self.featuresets.items():
+        for x in self.featuresets.values():
             for y in x.features.values():
-                if y[0] == feature_id:
+                if y.id == feature_id:
                     return x
         return None
 
     def get_feature_by_featureid(self, feature_id):
-        for dummy, x in self.featuresets.items():
-            for z, y in x.features.items():
-                if y[0] == feature_id:
-                    return z
+        for x in self.featuresets.Values():
+            for y in x.features.values():
+                if y.id == feature_id:
+                    return y
+        return None
 
     async def async_turn_on_by_featureset_id(self, featureset_id):
         await self.async_write_feature_by_name(featureset_id, "switch", 1)
