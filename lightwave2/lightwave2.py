@@ -187,7 +187,7 @@ class LWLink2:
                     _LOGGER.info("consumer_handler: Websocket reconnect requested by message handler")
             except AttributeError:  # websocket is None if not set up, just wait for a while
                 _LOGGER.debug("consumer_handler: websocket not ready, sleeping for 1 sec")
-                yield from asyncio.sleep(1)
+                await asyncio.sleep(1)
             except Exception as exp:
                 _LOGGER.warning("consumer_handler: unhandled exception ('{}')".format(exp))
 
