@@ -176,7 +176,7 @@ class LWLink2:
                             feature = self.get_feature_by_featureid(feature_id)
                             value = message["items"][0]["payload"]["value"]
                             prev_value = feature.state
-                            feature.state = value
+                            feature._state = value
                             cblist = [c.__name__ for c in self._callback]
                             _LOGGER.debug("consumer_handler: Event received (%s %s %s), calling callbacks %s", feature_id, feature, value, cblist)
                             for func in self._callback:
@@ -242,6 +242,7 @@ class LWLink2:
                     if z not in self.featuresets:
                         _LOGGER.debug("async_read_groups: Creating device {}".format(x))
                         new_featureset = LWRFFeatureSet()
+                        new_featureset.link = self
                         new_featureset.featureset_id = z
                         new_featureset.name = x["name"]
                         self.featuresets[z] = new_featureset
@@ -260,7 +261,7 @@ class LWLink2:
     async def async_update_featureset_states(self):
         for x in self.featuresets.values():
             for y in x.features.values():
-                value = await self.async_read_feature(y.name)
+                value = await self.async_read_feature(y.id)
                 if value["items"][0]["success"] == True:
                     y._state = value["items"][0]["payload"]["value"]
                 else:
