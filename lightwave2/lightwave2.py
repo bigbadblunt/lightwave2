@@ -77,14 +77,13 @@ class LWRFFeature:
         self.id = None
         self.name = None
         self._state = None
-        
+
     @property
     def state(self):
         return self._state
 
-    @state.setter
-    def state(self, value):
-        self.featureset.link.async_write_feature(self.id, value)
+    async def set_state(self, value):
+        await self.featureset.link.async_write_feature(self.id, value)
 
 class LWLink2:
 
@@ -275,7 +274,7 @@ class LWLink2:
         await self._async_sendmessage(readmess)
 
     async def async_write_feature_by_name(self, featureset_id, featurename, value):
-        self.featuresets[featureset_id].features[featurename].state = value
+        await self.featuresets[featureset_id].features[featurename].set_state(value)
 
     async def async_read_feature(self, feature_id):
         readmess = _LWRFWebsocketMessage("feature", "read")
@@ -627,8 +626,8 @@ class LWLink2Public(LWLink2):
 
             for featuresetid in self.featuresets:
                 for featurename in self.featuresets[featuresetid].features:
-                    if self.featuresets[featuresetid].features[featurename][0] in req:
-                        self.featuresets[featuresetid].features[featurename][1] = req[self.featuresets[featuresetid].features[featurename][0]]
+                    if self.featuresets[featuresetid].features[featurename].id in req:
+                        self.featuresets[featuresetid].features[featurename]._state = req[self.featuresets[featuresetid].features[featurename][0]]
 
     async def async_write_feature(self, feature_id, value):
         payload = {"value": value}
