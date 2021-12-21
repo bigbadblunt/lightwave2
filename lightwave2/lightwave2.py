@@ -49,6 +49,7 @@ class _LWRFWebsocketMessageItem:
 class LWRFFeatureSet:
 
     def __init__(self):
+        self.link = None
         self.featureset_id = None
         self.name = None
         self.product_code = None
@@ -72,8 +73,17 @@ class LWRFFeatureSet:
 class LWRFFeature:
 
     def __init__(self):
+        self.featureset = None
         self.id = None
-        self.name = None
+        self._state = None
+        
+    @property
+    def state(self):
+        return self._state
+
+    @state.setter
+    def state(self, value):
+        self.featureset.link.async_write_feature(self.id, value)
 
 class LWLink2:
 
