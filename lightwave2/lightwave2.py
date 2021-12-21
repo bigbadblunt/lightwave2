@@ -274,7 +274,7 @@ class LWLink2:
         await self._async_sendmessage(readmess)
 
     async def async_write_feature_by_name(self, featureset_id, featurename, value):
-        await self.async_write_feature(self.featuresets[featureset_id].features[featurename][0], value)
+        self.featuresets[featureset_id].features[featurename] = value
 
     async def async_read_feature(self, feature_id):
         readmess = _LWRFWebsocketMessage("feature", "read")
