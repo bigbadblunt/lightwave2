@@ -132,9 +132,9 @@ Then there is one more method for a thermostat
 
 And some methods for covers (blinds)
 
-    cover_open_by_featureset_id(self, featureset_id)
-    cover_close_by_featureset_id(self, featureset_id)
-    cover_stop_by_featureset_id(self, featureset_id)
+    link.cover_open_by_featureset_id(featureset_id)
+    link.cover_close_by_featureset_id(featureset_id)
+    link.cover_stop_by_featureset_id(featureset_id)
 
 #### Reading/writing to an arbitrary feature
 
