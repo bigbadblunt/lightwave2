@@ -256,7 +256,8 @@ class LWLink2:
                     y.features[feature.name] = feature 
 
             for x in list(response["items"][0]["payload"]["devices"].values()):
-                self.get_featureset_by_featureid(x['featureIds'][0]).product_code = x['productCode']
+                for y in x['featureIds']:
+                    self.get_featureset_by_featureid(y).product_code = x['productCode']
 
     async def async_update_featureset_states(self):
         for x in self.featuresets.values():
