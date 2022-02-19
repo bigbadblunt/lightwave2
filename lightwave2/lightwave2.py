@@ -359,18 +359,20 @@ class LWLink2:
     # Connection
     #########################################################
 
-    async def async_connect(self, max_tries=5, _retry=0):
-        try:
-            return await self._connect_to_server()
-        except Exception as exp:
-            if (max_tries == 0) or (_retry < max_tries):
-                retry_delay = min(2 ** (_retry + 1), 120)
-                _LOGGER.warning("async_connect: Cannot connect (exception '{}'). Waiting {} seconds to retry".format(repr(exp), retry_delay))
-                await asyncio.sleep(retry_delay)
-                return await self.async_connect(max_tries, _retry + 1)
-            else:
-                _LOGGER.warning("async_connect: Cannot connect, max_tries exceeded, aborting")
-                return False
+    async def async_connect(self, max_tries=5):
+        retry_delay = 2
+        for x in range(0, max_tries):
+            try:
+                return await self._connect_to_server()
+            except Exception as exp:
+                if x < max_tries-1:
+                    _LOGGER.warning("async_connect: Cannot connect (exception '{}'). Waiting {} seconds to retry".format(repr(exp), retry_delay))
+                    await asyncio.sleep(retry_delay)
+                    retry_delay = min(2 ** (retry_delay + 1), 120)
+                else:
+                    _LOGGER.warning("async_connect: Cannot connect (exception '{}'). No more retry".format(repr(exp), retry_delay))
+        _LOGGER.warning("async_connect: Cannot connect, max_tries exceeded, aborting")
+        return False
 
     async def _connect_to_server(self):
         if (not self._websocket) or self._websocket.closed:
@@ -646,8 +648,8 @@ class LWLink2Public(LWLink2):
     #########################################################
 
     async def _connect_to_server(self):
-            await self._get_access_token()
-            return True
+        await self._get_access_token()
+        return True
 
 
 
