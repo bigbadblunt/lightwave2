@@ -637,7 +637,7 @@ class LWLink2Public(LWLink2):
             for featuresetid in self.featuresets:
                 for featurename in self.featuresets[featuresetid].features:
                     if self.featuresets[featuresetid].features[featurename].id in req:
-                        self.featuresets[featuresetid].features[featurename]._state = req[self.featuresets[featuresetid].features[featurename][0]]
+                        self.featuresets[featuresetid].features[featurename]._state = req[self.featuresets[featuresetid].features[featurename].id]
 
     async def async_write_feature(self, feature_id, value):
         payload = {"value": value}
