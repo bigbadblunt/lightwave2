@@ -621,9 +621,9 @@ class LWLink2Public(LWLink2):
     async def async_update_featureset_states(self):
         feature_list = []
 
-        for dummy, x in self.featuresets.items():
-            for y in x.features:
-                feature_list.append({"featureId": x.features[y][0]})
+        for x in self.featuresets.values():
+            for y in x.features.values():
+                feature_list.append({"featureId": y.id})
 
         #split up the feature list into chunks as the public API doesn't like requests that are too long
         #200 seems safe
