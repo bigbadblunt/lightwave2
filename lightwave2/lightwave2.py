@@ -581,7 +581,7 @@ class LWLink2Public(LWLink2):
                         _LOGGER.debug("async_get_hierarchy: Adding device features {}".format(z))
                         feature = LWRFFeature()
                         feature.id = z["featureId"]
-                        feature.featureset = new_featureset.featureset_id
+                        feature.featureset = new_featureset
                         feature.name = z["type"]
                         new_featureset.features[z["type"]] = feature
 
