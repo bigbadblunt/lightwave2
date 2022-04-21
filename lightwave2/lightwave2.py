@@ -613,10 +613,9 @@ class LWLink2Public(LWLink2):
     def process_webhook_received(self, body):
 
         featureid = body['triggerEvent']['id']
-        featureset = self.get_featureset_by_featureid(featureid)
-        featurename = self.get_feature_by_featureid(featureid)
+        feature = self.get_feature_by_featureid(featureid)
         value = body['payload']['value']
-        featureset.features[featurename]._state = value
+        feature._state = value
 
     async def async_update_featureset_states(self):
         feature_list = []
