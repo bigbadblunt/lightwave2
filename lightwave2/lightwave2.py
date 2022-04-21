@@ -616,7 +616,7 @@ class LWLink2Public(LWLink2):
         featureset = self.get_featureset_by_featureid(featureid)
         featurename = self.get_feature_by_featureid(featureid)
         value = body['payload']['value']
-        featureset.features[featurename][1] = value
+        featureset.features[featurename]._state = value
 
     async def async_update_featureset_states(self):
         feature_list = []
