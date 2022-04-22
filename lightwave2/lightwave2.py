@@ -599,7 +599,19 @@ class LWLink2Public(LWLink2):
         payload = {"events": [{"type": "feature", "id": feature_id}],
                     "url": url,
                     "ref": ref}
-        req = await self._async_postrequest("events?New%20item=5bc4d06e87779374d29d7d9a-28-3157334318+1", payload)
+        req = await self._async_postrequest("events", payload)
+        #TODO: test for req = 200
+
+    async def async_register_webhook_list(self, url, feature_id_list, ref, overwrite = False):
+        if overwrite:
+            req = await self._async_deleterequest("events/" + ref)
+        feature_list = []
+        for feat in feature_id_list:
+            feature_list.append({"type": "feature", "id": feat})
+        payload = {"events": feature_list,
+                    "url": url,
+                    "ref": ref}
+        req = await self._async_postrequest("events", payload)
         #TODO: test for req = 200
 
     async def delete_all_webhooks(self):
