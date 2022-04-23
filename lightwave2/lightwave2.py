@@ -708,5 +708,9 @@ class LWLink2Public(LWLink2):
         await self._get_access_token()
         return True
 
+    async def async_force_reconnect(self, secs):
+        _LOGGER.debug("async_force_reconnect: not implemented for public API, skipping")
+
+
 
 
