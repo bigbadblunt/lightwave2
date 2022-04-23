@@ -155,8 +155,8 @@ class LWLink2:
                 mess = await self._websocket.receive()
                 _LOGGER.debug("consumer_handler: Received %s", mess)
             except AttributeError:  # websocket is None if not set up, just wait for a while
-                _LOGGER.debug("consumer_handler: websocket not ready, sleeping for 1 sec")
-                await asyncio.sleep(1)
+                _LOGGER.debug("consumer_handler: websocket not ready, sleeping for 0.1 sec")
+                await asyncio.sleep(0.1)
             except Exception as exp:
                 _LOGGER.warning("consumer_handler: unhandled exception ('{}')".format(exp))
             else:
