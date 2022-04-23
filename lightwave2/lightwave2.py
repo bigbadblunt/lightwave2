@@ -66,7 +66,7 @@ class LWRFFeatureSet:
     def is_windowsensor(self): return self.has_feature('windowPosition')
     def is_hub(self): return self.has_feature('buttonPress')
 
-    def is_gen2(self): return self.has_feature('upgrade')
+    def is_gen2(self): return (self.has_feature('upgrade') or self.has_feature('uiButton'))
     def reports_power(self): return self.has_feature('power')
     def has_led(self): return self.has_feature('rgbColor')
 
@@ -581,7 +581,7 @@ class LWLink2Public(LWLink2):
 
             for x in response["devices"]:
                 for y in x["featureSets"]:
-                    _LOGGER.debug("async_get_hierarchy: Creating device {}".format(x))
+                    _LOGGER.debug("async_get_hierarchy: Creating device {}".format(y))
                     new_featureset = LWRFFeatureSet()
                     new_featureset.link = self
                     new_featureset.featureset_id = y["featureSetId"]
