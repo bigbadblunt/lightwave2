@@ -614,6 +614,37 @@ class LWLink2Public(LWLink2):
         req = await self._async_postrequest("events", payload)
         #TODO: test for req = 200
 
+    async def async_register_webhook_all(self, url, ref, overwrite = False):
+        if overwrite:
+            webhooks = await self._async_getrequest("events")
+            for wh in webhooks:
+                if ref in wh["id"]:
+                    await self._async_deleterequest("events/" + wh["id"])
+        feature_list = []
+        for x in self.featuresets.values():
+            for y in x.features.values():
+                feature_list.append(y.id)
+        MAX_REQUEST_LENGTH = 200
+        feature_list_split = [feature_list[i:i + MAX_REQUEST_LENGTH] for i in range(0, len(feature_list), MAX_REQUEST_LENGTH)]
+        index = 1
+        for feat_list in feature_list_split:
+            f_list = []
+            for feat in feat_list:
+                f_list.append({"type": "feature", "id": feat})
+            payload = {"events": f_list,
+                "url": url,
+                "ref": ref+str(index)}
+            req = await self._async_postrequest("events", payload)
+            index += 1
+        #TODO: test for req = 200
+
+    async def async_get_webhooks(self):
+        webhooks = await self._async_getrequest("events")
+        wh_list = []
+        for wh in webhooks:
+            wh_list.append(wh["id"])
+        return wh_list
+
     async def delete_all_webhooks(self):
         webhooks = await self._async_getrequest("events")
         for wh in webhooks:
