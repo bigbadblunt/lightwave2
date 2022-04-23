@@ -198,7 +198,7 @@ class LWLink2:
                     for key, flag in self._transactions.items():
                         flag.set()
                     self._transactions = {}
-                    self._authtoken = None
+                    #self._authtoken = None
                     asyncio.ensure_future(self.async_connect())
                     _LOGGER.info("consumer_handler: Websocket reconnect requested by message handler")
 
@@ -359,11 +359,14 @@ class LWLink2:
     # Connection
     #########################################################
 
-    async def async_connect(self, max_tries=5):
+    async def async_connect(self, max_tries=5, force_keep_alive_secs=0):
         retry_delay = 2
         for x in range(0, max_tries):
             try:
-                return await self._connect_to_server()
+                result = await self._connect_to_server()
+                if force_keep_alive_secs > 0:
+                    asyncio.ensure_future(self.async_force_reconnect(force_keep_alive_secs))
+                return result
             except Exception as exp:
                 if x < max_tries-1:
                     _LOGGER.warning("async_connect: Cannot connect (exception '{}'). Waiting {} seconds to retry".format(repr(exp), retry_delay))
@@ -373,6 +376,13 @@ class LWLink2:
                     _LOGGER.warning("async_connect: Cannot connect (exception '{}'). No more retry".format(repr(exp), retry_delay))
         _LOGGER.warning("async_connect: Cannot connect, max_tries exceeded, aborting")
         return False
+
+    async def async_force_reconnect(self, secs):
+        while True:
+            await asyncio.sleep(secs)
+            _LOGGER.debug("async_force_reconnect: time elapsed, forcing a reconnection")
+            await self._websocket.close()
+
 
     async def _connect_to_server(self):
         if (not self._websocket) or self._websocket.closed:
