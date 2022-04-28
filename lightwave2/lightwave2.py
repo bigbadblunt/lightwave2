@@ -528,7 +528,7 @@ class LWLink2Public(LWLink2):
         async with self._session.get(PUBLIC_API + endpoint,
                                      headers= {"authorization": "bearer " + self._authtoken}
                                       ) as req:
-            _LOGGER.debug("async_getrequest: Received API response {} {} {} {}".format(req.status, req.raw_headers, await req.text(), await req.json(content_type=None)))
+            _LOGGER.debug("async_getrequest: Received API response {} {} {}".format(req.status, req.raw_headers, await req.text()))
             if (req.status == 429): #Rate limited
                 _LOGGER.debug("async_getrequest: rate limited, wait and retry")
                 await asyncio.sleep(1)
@@ -541,7 +541,7 @@ class LWLink2Public(LWLink2):
         async with self._session.post(PUBLIC_API + endpoint,
                                       headers= {"authorization": "bearer " + self._authtoken},
                                       json=body) as req:
-            _LOGGER.debug("async_postrequest: Received API response {} {} {} {}".format(req.status, req.raw_headers, await req.text(), await req.json(content_type=None)))
+            _LOGGER.debug("async_postrequest: Received API response {} {} {}".format(req.status, req.raw_headers, await req.text()))
             if (req.status == 429): #Rate limited
                 _LOGGER.debug("async_postrequest: rate limited, wait and retry")
                 await asyncio.sleep(1)
@@ -565,7 +565,7 @@ class LWLink2Public(LWLink2):
         async with self._session.delete(PUBLIC_API + endpoint,
                                      headers= {"authorization": "bearer " + self._authtoken}
                                       ) as req:
-            _LOGGER.debug("async_deleterequest: Received API response {} {} {} {}".format(req.status, req.raw_headers, await req.text(), await req.json(content_type=None)))
+            _LOGGER.debug("async_deleterequest: Received API response {} {} {}".format(req.status, req.raw_headers, await req.text()))
             if (req.status == 429): #Rate limited
                 _LOGGER.debug("async_deleterequest: rate limited, wait and retry")
                 await asyncio.sleep(1)
