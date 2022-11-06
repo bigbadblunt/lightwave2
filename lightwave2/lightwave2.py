@@ -66,7 +66,7 @@ class LWRFFeatureSet:
     def is_windowsensor(self): return self.has_feature('windowPosition')
     def is_hub(self): return self.has_feature('buttonPress')
 
-    def is_gen2(self): return (self.has_feature('upgrade') or self.has_feature('uiButton'))
+    def is_gen2(self): return (self.has_feature('upgrade') or self.has_feature('uiButton') or self.is_hub())
     def reports_power(self): return self.has_feature('power')
     def has_led(self): return self.has_feature('rgbColor')
 
@@ -142,7 +142,12 @@ class LWLink2:
         if self._response:
             return self._response
         elif _retry >= MAX_RETRIES:
-            _LOGGER.warning("async_sendmessage: Exceeding MAX_RETRIES, abandoning send")
+            if redact:
+                _LOGGER.warning("Exceeding MAX_RETRIES, abandoning send. Failed message %s", message.json())
+            else:
+                _LOGGER.warning("Exceeding MAX_RETRIES, abandoning send. Failed message not shown as contains sensitive info")
+            
+            _LOGGER.warning("async_sendmessage: Exceeding MAX_RETRIES, abandoning send. Failed message %s", )
             return None
         else:
             _LOGGER.info("async_sendmessage: Send failed, resending message (attempt %s)", _retry + 1)
@@ -371,7 +376,7 @@ class LWLink2:
                 if x < max_tries-1:
                     _LOGGER.warning("async_connect: Cannot connect (exception '{}'). Waiting {} seconds to retry".format(repr(exp), retry_delay))
                     await asyncio.sleep(retry_delay)
-                    retry_delay = min(2 ** (retry_delay + 1), 120)
+                    retry_delay = min(2 * retry_delay, 120)
                 else:
                     _LOGGER.warning("async_connect: Cannot connect (exception '{}'). No more retry".format(repr(exp), retry_delay))
         _LOGGER.warning("async_connect: Cannot connect, max_tries exceeded, aborting")
