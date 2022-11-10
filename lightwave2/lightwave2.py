@@ -64,6 +64,7 @@ class LWRFFeatureSet:
     def is_cover(self): return self.has_feature('threeWayRelay')
     def is_energy(self): return (self.has_feature('energy')) and (self.has_feature('rssi'))
     def is_windowsensor(self): return self.has_feature('windowPosition')
+    def is_motionsensor(self): return self.has_feature('movement')
     def is_hub(self): return self.has_feature('buttonPress')
 
     def is_gen2(self): return (self.has_feature('upgrade') or self.has_feature('uiButton') or self.is_hub())
@@ -356,6 +357,9 @@ class LWLink2:
 
     def get_windowsensors(self):
         return [(x.featureset_id, x.name) for x in self.featuresets.values() if x.is_windowsensor()]
+
+    def get_motionsensors(self):
+        return [(x.featureset_id, x.name) for x in self.featuresets.values() if x.is_motionsensor()]
 
     def get_hubs(self):
         return [(x.featureset_id, x.name) for x in self.featuresets.values() if x.is_hub()]
