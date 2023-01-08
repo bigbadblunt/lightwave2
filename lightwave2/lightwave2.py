@@ -683,7 +683,7 @@ class LWLink2Public(LWLink2):
         feature._state = value
         
         cblist = [c.__name__ for c in self._callback]
-        _LOGGER.debug("consumer_handler: Event received (%s %s %s), calling callbacks %s", featureid, feature, value, cblist)
+        _LOGGER.debug("process_webhook_received: Event received (%s %s %s), calling callbacks %s", featureid, feature, value, cblist)
         for func in self._callback:
             func(feature=feature.name, feature_id=feature.id, prev_value = prev_value, new_value = value)
 
