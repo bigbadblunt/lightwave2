@@ -103,10 +103,12 @@ class LWLink2:
         self._session = aiohttp.ClientSession()
         self._token_expiry = None
 
+        self._callback = []
+
         # Websocket only variables:
         self._device_id = str(uuid.uuid4())
         self._websocket = None
-        self._callback = []
+
         self._group_ids = []
 
         # Next two variables are used to synchronise responses to requests
@@ -531,6 +533,8 @@ class LWLink2Public(LWLink2):
         self._session = aiohttp.ClientSession()
         self._token_expiry = None
 
+        self._callback = []
+
     # TODO add retries/error checking to public API requests
     async def _async_getrequest(self, endpoint, _retry=1):
         _LOGGER.debug("async_getrequest: Sending API GET request to {}".format(endpoint))
@@ -609,9 +613,6 @@ class LWLink2Public(LWLink2):
 
         await self.async_update_featureset_states()
 
-    async def async_register_callback(self, callback):
-        pass
-
     async def async_register_webhook(self, url, feature_id, ref, overwrite = False):
         if overwrite:
             req = await self._async_deleterequest("events/" + ref)
@@ -678,7 +679,13 @@ class LWLink2Public(LWLink2):
         featureid = body['triggerEvent']['id']
         feature = self.get_feature_by_featureid(featureid)
         value = body['payload']['value']
+        prev_value = feature.state
         feature._state = value
+        
+        cblist = [c.__name__ for c in self._callback]
+        _LOGGER.debug("consumer_handler: Event received (%s %s %s), calling callbacks %s", featureid, feature, value, cblist)
+        for func in self._callback:
+            func(feature=feature.name, feature_id=feature.id, prev_value = prev_value, new_value = value)
 
     async def async_update_featureset_states(self):
         feature_list = []
