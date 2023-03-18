@@ -265,7 +265,12 @@ class LWLink2:
 
             for x in list(response["items"][0]["payload"]["devices"].values()):
                 for y in x['featureIds']:
-                    self.get_featureset_by_featureid(y).product_code = x['productCode']
+                    _LOGGER.debug("async_read_groups: Getting product codes {}".format(x))
+                    try:
+                        self.get_featureset_by_featureid(y).product_code = x['productCode']
+                    except:
+                        _LOGGER.debug("async_read_groups: No product code {}".format(x))
+                        self.get_featureset_by_featureid(y).product_code = 'Unknown'
 
     async def async_update_featureset_states(self):
         for x in self.featuresets.values():
