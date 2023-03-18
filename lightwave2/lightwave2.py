@@ -270,7 +270,6 @@ class LWLink2:
                         self.get_featureset_by_featureid(y).product_code = x['productCode']
                     except:
                         _LOGGER.debug("async_read_groups: No product code {}".format(x))
-                        self.get_featureset_by_featureid(y).product_code = 'Unknown'
 
     async def async_update_featureset_states(self):
         for x in self.featuresets.values():
