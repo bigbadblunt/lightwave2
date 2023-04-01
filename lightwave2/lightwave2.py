@@ -278,7 +278,7 @@ class LWLink2:
                 if value["items"][0]["success"] == True:
                     y._state = value["items"][0]["payload"]["value"]
                 else:
-                    _LOGGER.warning("update_featureset_states: failed to read feature ({}), returned {}".format(x.features[y].id, value))
+                    _LOGGER.warning("update_featureset_states: failed to read feature ({}), returned {}".format(y.id, value))
 
     async def async_write_feature(self, feature_id, value):
         readmess = _LWRFWebsocketMessage("feature", "write")
