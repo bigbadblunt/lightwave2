@@ -88,7 +88,7 @@ class LWRFFeature:
 
 class LWLink2:
 
-    def __init__(self, username=None, password=None, auth_method="username", api_token=None, refresh_token=None):
+    def __init__(self, username=None, password=None, auth_method="username", api_token=None, refresh_token=None, device_id=None):
 
         self.featuresets = {}
         self._authtoken = None
@@ -106,7 +106,7 @@ class LWLink2:
         self._callback = []
 
         # Websocket only variables:
-        self._device_id = str(uuid.uuid4())
+        self._device_id = (device_id or "PLW2:") + str(uuid.uuid4())
         self._websocket = None
 
         self._group_ids = []
