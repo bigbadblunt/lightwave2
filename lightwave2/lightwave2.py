@@ -514,8 +514,6 @@ class LWLink2:
 
     def get_featuresets(self, featuresets, devices, features):
         for y in featuresets:
-            _LOGGER.warning("async_get_hierarchy: Creating device {}".format(y))
-
             new_featureset = LWRFFeatureSet()
             new_featureset.link = self
             new_featureset.featureset_id = y["groupId"]
@@ -621,7 +619,7 @@ class LWLink2Public(LWLink2):
                     new_featureset.link = self
                     new_featureset.featureset_id = y["featureSetId"]
                     new_featureset.product_code = x["productCode"]
-                    new_featureset.name = x["name"]
+                    new_featureset.name = y["name"]
 
                     for z in y["features"]:
                         _LOGGER.debug("async_get_hierarchy: Adding device features {}".format(z))
