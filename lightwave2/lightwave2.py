@@ -188,12 +188,17 @@ class LWLink2:
                             feature_id = message["items"][0]["payload"]["featureId"]
                             feature = self.get_feature_by_featureid(feature_id)
                             value = message["items"][0]["payload"]["value"]
-                            prev_value = feature.state
-                            feature._state = value
-                            cblist = [c.__name__ for c in self._callback]
-                            _LOGGER.debug("consumer_handler: Event received (%s %s %s), calling callbacks %s", feature_id, feature, value, cblist)
-                            for func in self._callback:
-                                func(feature=feature.name, feature_id=feature.id, prev_value = prev_value, new_value = value)
+                            
+                            if feature is None:
+                                _LOGGER.debug("consumer_handler: feature is None: %s)", feature_id)
+                            else:
+                                prev_value = feature.state
+
+                                feature._state = value
+                                cblist = [c.__name__ for c in self._callback]
+                                _LOGGER.debug("consumer_handler: Event received (%s %s %s), calling callbacks %s", feature_id, feature, value, cblist)
+                                for func in self._callback:
+                                    func(feature=feature.name, feature_id=feature.id, prev_value = prev_value, new_value = value)
                         else:
                             _LOGGER.warning("consumer_handler: Unhandled event message: %s", message)
                     else:
