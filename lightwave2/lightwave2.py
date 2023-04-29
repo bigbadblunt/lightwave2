@@ -88,7 +88,7 @@ class LWRFFeature:
 
 class LWLink2:
 
-    def __init__(self, username=None, password=None, auth_method="username", api_token=None, refresh_token=None):
+    def __init__(self, username=None, password=None, auth_method="username", api_token=None, refresh_token=None, device_id=None):
 
         self.featuresets = {}
         self._authtoken = None
@@ -106,7 +106,7 @@ class LWLink2:
         self._callback = []
 
         # Websocket only variables:
-        self._device_id = str(uuid.uuid4())
+        self._device_id = (device_id or "PLW2:") + str(uuid.uuid4())
         self._websocket = None
 
         self._group_ids = []
@@ -188,12 +188,17 @@ class LWLink2:
                             feature_id = message["items"][0]["payload"]["featureId"]
                             feature = self.get_feature_by_featureid(feature_id)
                             value = message["items"][0]["payload"]["value"]
-                            prev_value = feature.state
-                            feature._state = value
-                            cblist = [c.__name__ for c in self._callback]
-                            _LOGGER.debug("consumer_handler: Event received (%s %s %s), calling callbacks %s", feature_id, feature, value, cblist)
-                            for func in self._callback:
-                                func(feature=feature.name, feature_id=feature.id, prev_value = prev_value, new_value = value)
+                            
+                            if feature is None:
+                                _LOGGER.debug("consumer_handler: feature is None: %s)", feature_id)
+                            else:
+                                prev_value = feature.state
+
+                                feature._state = value
+                                cblist = [c.__name__ for c in self._callback]
+                                _LOGGER.debug("consumer_handler: Event received (%s %s %s), calling callbacks %s", feature_id, feature, value, cblist)
+                                for func in self._callback:
+                                    func(feature=feature.name, feature_id=feature.id, prev_value = prev_value, new_value = value)
                         else:
                             _LOGGER.warning("consumer_handler: Unhandled event message: %s", message)
                     else:
@@ -233,43 +238,30 @@ class LWLink2:
     async def _async_read_groups(self):
         self.featuresets = {}
         for groupId in self._group_ids:
-            readmess = _LWRFWebsocketMessage("group", "read")
-            readitem = _LWRFWebsocketMessageItem({"groupId": groupId,
-                                         "blocks": True,
+            readmess = _LWRFWebsocketMessage("group", "hierarchy")
+            readitem = _LWRFWebsocketMessageItem({"groupId": groupId})
+
+            readmess.additem(readitem)
+            hierarchy_response = await self._async_sendmessage(readmess)
+
+            readmess2 = _LWRFWebsocketMessage("group", "read")
+            readitem2 = _LWRFWebsocketMessageItem({"groupId": groupId,
                                          "devices": True,
                                          "features": True,
-                                         "scripts": True,
+                                        #  "automations": True,
                                          "subgroups": True,
-                                         "subgroupDepth": 10})
-            readmess.additem(readitem)
-            response = await self._async_sendmessage(readmess)
+                                         "subgroupDepth": 10
+                                         })
+            
+            readmess2.additem(readitem2)
+            group_read_response = await self._async_sendmessage(readmess2)
 
-            for x in list(response["items"][0]["payload"]["features"].values()):
-                for z in x["groups"]:
+            devices = list(group_read_response["items"][0]["payload"]["devices"].values())
+            features = list(group_read_response["items"][0]["payload"]["features"].values())
 
-                    if z not in self.featuresets:
-                        _LOGGER.debug("async_read_groups: Creating device {}".format(x))
-                        new_featureset = LWRFFeatureSet()
-                        new_featureset.link = self
-                        new_featureset.featureset_id = z
-                        new_featureset.name = x["name"]
-                        self.featuresets[z] = new_featureset
-
-                    _LOGGER.debug("async_read_groups: Adding device features {}".format(x))
-                    y = self.featuresets[z]
-                    feature = LWRFFeature()
-                    feature.featureset = y
-                    feature.name = x["attributes"]["type"]
-                    feature.id = x["featureId"]
-                    y.features[feature.name] = feature 
-
-            for x in list(response["items"][0]["payload"]["devices"].values()):
-                for y in x['featureIds']:
-                    _LOGGER.debug("async_read_groups: Getting product codes {}".format(x))
-                    try:
-                        self.get_featureset_by_featureid(y).product_code = x['productCode']
-                    except:
-                        _LOGGER.debug("async_read_groups: No product code {}".format(x))
+            featuresets = list(hierarchy_response["items"][0]["payload"]["featureSet"])
+            
+            self.get_featuresets(featuresets, devices, features)
 
     async def async_update_featureset_states(self):
         for x in self.featuresets.values():
@@ -519,6 +511,35 @@ class LWLink2:
     def connect(self):
         return asyncio.get_event_loop().run_until_complete(self.async_connect())
 
+    def get_from_lw_ar_by_id(self, ar, id, label):
+        for x in ar:
+            if x[label] == id:
+                return x
+        return None
+
+    def get_featuresets(self, featuresets, devices, features):
+        for y in featuresets:
+            new_featureset = LWRFFeatureSet()
+            new_featureset.link = self
+            new_featureset.featureset_id = y["groupId"]
+            
+            device = self.get_from_lw_ar_by_id(devices, y["deviceId"], "deviceId")
+
+            new_featureset.product_code = device["productCode"]
+
+            new_featureset.name = y["name"]
+
+            for z in y["features"]:
+                feature = LWRFFeature()
+                feature.id = z
+                feature.featureset = new_featureset
+
+                _feature = self.get_from_lw_ar_by_id(features, z, 'featureId')
+                feature.name = _feature["attributes"]["type"]
+                new_featureset.features[_feature["attributes"]["type"]] = feature
+
+            self.featuresets[y["groupId"]] = new_featureset
+
 
 class LWLink2Public(LWLink2):
 
@@ -603,7 +624,7 @@ class LWLink2Public(LWLink2):
                     new_featureset.link = self
                     new_featureset.featureset_id = y["featureSetId"]
                     new_featureset.product_code = x["productCode"]
-                    new_featureset.name = x["name"]
+                    new_featureset.name = y["name"]
 
                     for z in y["features"]:
                         _LOGGER.debug("async_get_hierarchy: Adding device features {}".format(z))
